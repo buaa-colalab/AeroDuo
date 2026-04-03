@@ -35,9 +35,9 @@ class PilotLLM(Qwen2VLForConditionalGeneration):
         super(PilotLLM, self).__init__(config)
 
         self.num_image_token = kwargs.get("num_image_token", 784)
-        self.mask_head = MaskHead(config.hidden_size)
+        self.seg_head = MaskHead(config.hidden_size)
         self.depth_head = MaskHead(config.hidden_size)
-        self.mask_query = nn.Parameter(
+        self.seg_query = nn.Parameter(
             torch.zeros([self.num_image_token , self.config.hidden_size]))
         self.ce_loss = nn.CrossEntropyLoss() # 自带sigmoid激活函数
         self.bce_loss = nn.BCEWithLogitsLoss()
@@ -116,7 +116,7 @@ class PilotLLM(Qwen2VLForConditionalGeneration):
             special_mask = (input_ids == self.config.image_token_id) & (labels == self.config.image_token_id)
             for i in range(bs):
                 mask_indices = special_mask[i].nonzero(as_tuple=True)[0]
-                inputs_embeds[i, mask_indices] = self.mask_query
+                inputs_embeds[i, mask_indices] = self.seg_query
                 
             if attention_mask is not None:
                 attention_mask = attention_mask.to(inputs_embeds.device)
@@ -155,8 +155,8 @@ class PilotLLM(Qwen2VLForConditionalGeneration):
 
         hidden_states = outputs.last_hidden_state
 
-        mask_query = hidden_states[special_mask].view(bs, self.num_image_token, self.config.hidden_size)
-        preds = self.mask_head(mask_query, image_grid_thw[-1])
+        seg_query = hidden_states[special_mask].view(bs, self.num_image_token, self.config.hidden_size)
+        preds = self.seg_head(seg_query, image_grid_thw[-1])
 
         if is_inference:
             return preds

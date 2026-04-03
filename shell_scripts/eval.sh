@@ -1,6 +1,6 @@
 python -u full_eval.py \
     --name test-eval \
-    --use_a_star True \
+    --use_a_star False \
     --batchSize 1 \
     --EVAL_NUM -1 \
     --gpu_id 0 \
