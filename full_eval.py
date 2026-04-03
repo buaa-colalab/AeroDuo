@@ -17,6 +17,9 @@ from src.vlnce_src.env_uav import AirVLNENV
 from utils.utils import is_dist_avail_and_initialized
 from utils.logger import logger
 
+import traceback
+import msgpackrpc
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -379,7 +382,7 @@ class TrajectoryStatus:
             metrics.sst_cnt += sst_cnt
         elif self.oracle_success[0]:
             metrics.oracle_success_cnt += 1
-        if self.collisions[0]:
+        if self.collisions[0] and not self.success[0]:
             metrics.collision_cnt += 1
         if self.airsim_collision:
             metrics.airsim_collision_cnt += 1
@@ -636,11 +639,13 @@ def main():
                 traj_status.update_observation(outputs, pos_list, airsim_collision)
 
 if __name__ == "__main__":
-    main()
-    # while True:
-    #     try:
-    #         main()
-    #     except Exception as e:
-    #         print(f"Exception occurred: {e}")
-    #         time.sleep(1)
-    #         continue
+    # Airsim simulator server is very unstable, so we need to retry if it fails
+    while True:
+        try:
+            main()
+            break
+        except (msgpackrpc.error.TimeoutError, ConnectionError, TimeoutError) as e:
+            print(f"AirSim connection error, retrying: {e}")
+            traceback.print_exc()
+            time.sleep(3)
+            continue
