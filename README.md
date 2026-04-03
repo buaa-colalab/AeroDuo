@@ -110,7 +110,7 @@ The file directory of environments is as follows:
 We provide a shell script to finetune the PilotLLM on the HaL-13k dataset.
 
 ## 1. Configuration
-Before starting, ensure the distributed training settings in `pilot_llm/default_deepspeed.yaml` match your situation. You can adjust parameters such as the `num_processes` to decide the number of gpu to use:
+Before running the `train.sh` script, ensure that the distributed training settings in `pilot_llm/default_deepspeed.yaml` match your situation. You can adjust parameters such as the `num_processes` to decide the number of gpu to use (default is 4).
 
 ## 2. Start Training
 Run the following command to start the training process:
@@ -121,9 +121,9 @@ bash shell_scripts/train.sh
 
 # ✅ Evaluation <a id="eval"></a>
 
-## 1. setup simulator env server
+## 1. Setup simulator env server
 
-Before running the simulations, ensure the AirSim environment server is properly configured.
+Before running the simulations, ensure that the AirSim environment server is properly configured.
 
 > Update the env executable paths`env_exec_path_dict` relative to `root_path` in `AirVLNSimulatorServerTool.py`.
 
@@ -131,7 +131,7 @@ Before running the simulations, ensure the AirSim environment server is properly
 python airsim_plugin/AirVLNSimulatorServerTool.py --port 50000 
 ```
 
-## 2. run close-loop simulation
+## 2. Run close-loop simulation
 
 Once the simulator server is running, you can execute the dagger or evaluation script.
 
@@ -139,6 +139,17 @@ Once the simulator server is running, you can execute the dagger or evaluation s
 # Eval
 bash shell_scripts/eval.sh
 ```
+
+## 3. Calculate final metrics
+
+After evaluation, parse the output directory to compute metrics (SR, OSR, CR, SPL, SST, APL, NE) across all subsets:
+
+```bash
+python result_parser.py --result_dir ./output --testset data/test_unseen_new.json
+```
+
+The script prints a table with results for **Full**, **UM** (Unseen Map), and **UO** (Unseen Object) subsets.
+
 
 To evaluate your own finetune result, replace the `llm_checkpoint_path` in the `eval.sh` with your own checkpoint path.
 
