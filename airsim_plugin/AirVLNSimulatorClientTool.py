@@ -578,44 +578,30 @@ class AirVLNSimulatorClientTool:
         def _getImages(airsim_client: airsim.MultirotorClient):
             if airsim_client is None:
                 raise Exception('client is None.')
-                return None, None
-            time_sleep_cnt = 0
-            while True:
-                try:
-                    ImageRequest = []
-                    for camera_name in cameras:
-                        ImageRequest.append(airsim.ImageRequest(camera_name, airsim.ImageType.Scene, pixels_as_float=False, compress=False))
-                        ImageRequest.append(airsim.ImageRequest(camera_name, airsim.ImageType.DepthPerspective, pixels_as_float=True, compress=False))
-                    image_datas = airsim_client.simGetImages(vehicle_name='Drone_1', requests=ImageRequest)
-                    images, depth_images = [], []
-                    for idx, camera_name in enumerate(cameras):
-                        rgb_resp = image_datas[2 * idx]
-                        image = np.frombuffer(rgb_resp.image_data_uint8, dtype=np.uint8).reshape(rgb_resp.height, rgb_resp.width, 3)
-                        depth_resp = image_datas[2* idx + 1]
-                        depth_img_in_meters = airsim.list_to_2d_float_array(depth_resp.image_data_float, depth_resp.width, depth_resp.height)
-                        depth_image = (np.clip(depth_img_in_meters, 0, 100) / 100 * 255).astype(np.uint8)
-                        images.append(image)
-                        depth_images.append(depth_image)
-                    if use_bev:
-                        bev_request = []
-                        bev_request.append(airsim.ImageRequest('BEVCamera', airsim.ImageType.Scene, pixels_as_float=False, compress=False))
-                        bev_request.append(airsim.ImageRequest('BEVCamera', airsim.ImageType.DepthPlanar, pixels_as_float=True, compress=False))
-                        bev_datas = airsim_client.simGetImages(vehicle_name='Drone_2', requests=bev_request)
-                        bev_image = bev_datas[0]
-                        bev_image = np.frombuffer(bev_image.image_data_uint8, dtype=np.uint8).reshape(bev_image.height, bev_image.width, 3)
-                        bev_depth = bev_datas[1]
-                        bev_depth_in_meters = airsim.list_to_2d_float_array(bev_depth.image_data_float, bev_depth.width, bev_depth.height)
-                        bev_depth = bev_depth_in_meters.astype(np.uint8)
-
-                    break
-                    
-                except Exception as e:
-                    time_sleep_cnt += 1
-                    print("图片获取错误: " + str(e))
-                    print('time_sleep_cnt: {}'.format(time_sleep_cnt))
-                    time.sleep(1)
-                if time_sleep_cnt > 10:
-                    raise Exception('图片获取失败')
+            ImageRequest = []
+            for camera_name in cameras:
+                ImageRequest.append(airsim.ImageRequest(camera_name, airsim.ImageType.Scene, pixels_as_float=False, compress=False))
+                ImageRequest.append(airsim.ImageRequest(camera_name, airsim.ImageType.DepthPerspective, pixels_as_float=True, compress=False))
+            image_datas = airsim_client.simGetImages(vehicle_name='Drone_1', requests=ImageRequest)
+            images, depth_images = [], []
+            for idx, camera_name in enumerate(cameras):
+                rgb_resp = image_datas[2 * idx]
+                image = np.frombuffer(rgb_resp.image_data_uint8, dtype=np.uint8).reshape(rgb_resp.height, rgb_resp.width, 3)
+                depth_resp = image_datas[2* idx + 1]
+                depth_img_in_meters = airsim.list_to_2d_float_array(depth_resp.image_data_float, depth_resp.width, depth_resp.height)
+                depth_image = (np.clip(depth_img_in_meters, 0, 100) / 100 * 255).astype(np.uint8)
+                images.append(image)
+                depth_images.append(depth_image)
+            if use_bev:
+                bev_request = []
+                bev_request.append(airsim.ImageRequest('BEVCamera', airsim.ImageType.Scene, pixels_as_float=False, compress=False))
+                bev_request.append(airsim.ImageRequest('BEVCamera', airsim.ImageType.DepthPlanar, pixels_as_float=True, compress=False))
+                bev_datas = airsim_client.simGetImages(vehicle_name='Drone_2', requests=bev_request)
+                bev_image = bev_datas[0]
+                bev_image = np.frombuffer(bev_image.image_data_uint8, dtype=np.uint8).reshape(bev_image.height, bev_image.width, 3)
+                bev_depth = bev_datas[1]
+                bev_depth_in_meters = airsim.list_to_2d_float_array(bev_depth.image_data_float, bev_depth.width, bev_depth.height)
+                bev_depth = bev_depth_in_meters.astype(np.uint8)
             if use_bev:
                 return images, depth_images, bev_image, bev_depth
             return images, depth_images

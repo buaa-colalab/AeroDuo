@@ -110,7 +110,6 @@ class AirVLNENV:
         self.data = self.ori_raw_data
         
         if dataset_group_by_scene:
-            # 根据场景排序data
             self.data = self._group_scenes()
             logger.warning('dataset grouped by scene, ')
 
@@ -337,19 +336,10 @@ class AirVLNENV:
             logger.warning('to change env: {}'.format(using_map_list))
 
         #
-        while True:
-            try:
-                self.machines_info = copy.deepcopy(machines_info)
-                print('machines_info:', self.machines_info)
-                self.simulator_tool = AirVLNSimulatorClientTool(machines_info=self.machines_info)
-                self.simulator_tool.run_call()
-                break
-            except Exception as e:
-                logger.error("启动场景失败 {}".format(e))
-                time.sleep(3)
-            except:
-                logger.error('启动场景失败')
-                time.sleep(3)
+        self.machines_info = copy.deepcopy(machines_info)
+        print('machines_info:', self.machines_info)
+        self.simulator_tool = AirVLNSimulatorClientTool(machines_info=self.machines_info)
+        self.simulator_tool.run_call()
 
         self.last_using_map_list = using_map_list.copy()
         self.this_scene_used_cnt = 1
