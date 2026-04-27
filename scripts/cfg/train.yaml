@@ -10,7 +10,7 @@ device: "cuda:0"
 seed: 0
 
 # Total Training Length
-max_frame_num: 12e8 # max frame 
+max_frame_num: 12e8 # max frame
 eval_interval: 1000 # evaluate the policy for every N training steps
 save_interval: 1000
 
@@ -18,7 +18,7 @@ save_interval: 1000
 env:
   num_envs: 10 # Number of drones for training
   max_episode_length: 2200
-  env_spacing: 8.0 
+  env_spacing: 8.0
 
 env_dyn:
   num_obstacles: 0 # set to zero if static env is needed

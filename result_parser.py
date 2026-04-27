@@ -1,6 +1,6 @@
-import os
-import json
 import argparse
+import json
+import os
 
 TESTSET_JSON = "data/test_unseen_new.json"
 MARKS = ["full", "UM", "UO"]
@@ -22,7 +22,10 @@ def get_map_name(traj_name, testset):
 def analyse_eval_log(result_dir, testset_path=TESTSET_JSON):
     testset = load_testset(testset_path)
 
-    keys = ["collision", "oracle_success", "success", "spl", "sst", "path_length", "distance_to_end"]
+    keys = [
+        "collision", "oracle_success", "success", "spl", "sst", "path_length",
+        "distance_to_end"
+    ]
     acc = {k: {m: 0 for m in MARKS} for k in keys}
     total_cnt = {m: 0 for m in MARKS}
 
@@ -45,7 +48,8 @@ def analyse_eval_log(result_dir, testset_path=TESTSET_JSON):
         for mark in ["full", subset_mark]:
             for k in keys:
                 if k == "collision":
-                    acc[k][mark] += 1 if (s["collision"] and not s["success"]) else 0
+                    acc[k][mark] += 1 if (s["collision"]
+                                          and not s["success"]) else 0
                 elif k in ("oracle_success", "success"):
                     acc[k][mark] += 1 if s[k] else 0
                 else:
@@ -58,22 +62,26 @@ def analyse_eval_log(result_dir, testset_path=TESTSET_JSON):
             return
 
     display = [
-        ("SR",  "success",        100),
+        ("SR", "success", 100),
         ("OSR", "oracle_success", 100),
-        ("CR",  "collision",      100),
-        ("SPL", "spl",            100),
-        ("SST", "sst",            100),
-        ("APL", "path_length",      1),
-        ("NE",  "distance_to_end",  1),
+        ("CR", "collision", 100),
+        ("SPL", "spl", 100),
+        ("SST", "sst", 100),
+        ("APL", "path_length", 1),
+        ("NE", "distance_to_end", 1),
     ]
 
     sep = "-" * 46
     print(sep)
     print(f'{"":^10}|{"Full":^10}|{"UM":^10}|{"UO":^10}')
-    print(f'{"Total Cnt":^10}|{total_cnt["full"]:^10}|{total_cnt["UM"]:^10}|{total_cnt["UO"]:^10}')
+    print(
+        f'{"Total Cnt":^10}|{total_cnt["full"]:^10}|{total_cnt["UM"]:^10}|{total_cnt["UO"]:^10}'
+    )
     for label, key, scale in display:
         vals = {m: acc[key][m] / total_cnt[m] * scale for m in MARKS}
-        print(f'{label:^10}|{vals["full"]:^10.2f}|{vals["UM"]:^10.2f}|{vals["UO"]:^10.2f}')
+        print(
+            f'{label:^10}|{vals["full"]:^10.2f}|{vals["UM"]:^10.2f}|{vals["UO"]:^10.2f}'
+        )
     print(sep)
 
 

@@ -128,7 +128,7 @@ Before running the simulations, ensure that the AirSim environment server is pro
 > Update the env executable paths`env_exec_path_dict` relative to `root_path` in `AirVLNSimulatorServerTool.py`.
 
 ```bash
-python airsim_plugin/AirVLNSimulatorServerTool.py --port 50000 
+python airsim_plugin/AirVLNSimulatorServerTool.py --port 50000
 ```
 
 ## 2. Run close-loop simulation
@@ -153,7 +153,7 @@ The script prints a table with results for **Full**, **UM** (Unseen Map), and **
 
 To evaluate your own finetune result, replace the `llm_checkpoint_path` in the `eval.sh` with your own checkpoint path.
 
-💡 **Performance Tip**: 
+💡 **Performance Tip**:
 The user could consider setting --use_a_star in `eval.sh` to False (default is True). The current internal A* algorithm implementation is unoptimized and may significantly result in slow execution speeds.
 
 # 📆 TODO <a name="todos"></a>

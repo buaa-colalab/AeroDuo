@@ -1,190 +1,205 @@
 import argparse
-import math
-import threading
-import traceback
-import msgpackrpc
-from pathlib import Path
-import glob
-import time
-import os
-import json
-import sys
-import subprocess
-import errno
-import signal
 import copy
+import errno
+import glob
+import json
+import math
+import os
+import signal
+import subprocess
+import sys
+import threading
+import time
+import traceback
+from pathlib import Path
 
+import msgpackrpc
 
 AIRSIM_SETTINGS_TEMPLATE = {
-  "SeeDocsAt": "https://microsoft.github.io/AirSim/settings/",
-  "SettingsVersion": 1.2,
-  "SimMode": "Multirotor",
-  "ClockSpeed": 10,
-  "ViewMode": "NoDisplay",
-  "PhysiceEngineName": "ExternalPhysicsEngine",
-  "Recording": {
-    "RecordInterval": 1,
-    "Enabled": False,
-    "Cameras": []
-  },
-  "Vehicles": {
-    "Drone_1": {
-      "VehicleType": "SimpleFlight",
-      "UseSerial": False,
-      "LockStep": True,
-      "AutoCreate": True,
-      "X": 0,
-      "Y": 0,
-      "Z": 0,
-      "Roll": 0,
-      "Pitch": 0,
-      "Yaw": 0,
-      "Cameras": {
-        "FrontCamera": {
-          "X": 1,
-          "Y": 0,
-          "Z": 0,
-          "Pitch": 0,
-          "Roll": 0,
-          "Yaw": 0,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
+    "SeeDocsAt": "https://microsoft.github.io/AirSim/settings/",
+    "SettingsVersion": 1.2,
+    "SimMode": "Multirotor",
+    "ClockSpeed": 10,
+    "ViewMode": "NoDisplay",
+    "PhysiceEngineName": "ExternalPhysicsEngine",
+    "Recording": {
+        "RecordInterval": 1,
+        "Enabled": False,
+        "Cameras": []
+    },
+    "Vehicles": {
+        "Drone_1": {
+            "VehicleType": "SimpleFlight",
+            "UseSerial": False,
+            "LockStep": True,
+            "AutoCreate": True,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "Roll": 0,
+            "Pitch": 0,
+            "Yaw": 0,
+            "Cameras": {
+                "FrontCamera": {
+                    "X":
+                    1,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    0,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                },
+                "RearCamera": {
+                    "X":
+                    -1,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    180,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                },
+                "LeftCamera": {
+                    "X":
+                    0,
+                    "Y":
+                    -1,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    -90,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                },
+                "RightCamera": {
+                    "X":
+                    0,
+                    "Y":
+                    1,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    90,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                },
+                "DownCamera": {
+                    "X":
+                    0,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    -90,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    0,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                }
             },
-            {
-              "ImageType": 2,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
+            "Sensors": {
+                "Imu": {
+                    "SensorType": 2,
+                    "Enabled": True,
+                    "AngularRandomWalk": 0.3,
+                    "GyroBiasStabilityTau": 500,
+                    "GyroBiasStability": 4.6,
+                    "VelocityRandomWalk": 0.24,
+                    "AccelBiasStabilityTau": 800,
+                    "AccelBiasStability": 36
+                }
             }
-          ]
-        },
-        "RearCamera": {
-          "X": -1,
-          "Y": 0,
-          "Z": 0,
-          "Pitch": 0,
-          "Roll": 0,
-          "Yaw": 180,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            },
-            {
-              "ImageType": 2,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            }
-          ]
-        },
-        "LeftCamera": {
-          "X": 0,
-          "Y": -1,
-          "Z": 0,
-          "Pitch": 0,
-          "Roll": 0,
-          "Yaw": -90,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            },
-            {
-              "ImageType": 2,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            }
-          ]
-        },
-        "RightCamera": {
-          "X": 0,
-          "Y": 1,
-          "Z": 0,
-          "Pitch": 0,
-          "Roll": 0,
-          "Yaw": 90,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            },
-            {
-              "ImageType": 2,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            }
-          ]
-        },
-        "DownCamera": {
-          "X": 0,
-          "Y": 0,
-          "Z": 0,
-          "Pitch": -90,
-          "Roll": 0,
-          "Yaw": 0,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            },
-            {
-              "ImageType": 2,
-              "Width": 256,
-              "Height": 256,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            }
-          ]
         }
-      },
-      "Sensors": {
-          "Imu": {
-                "SensorType": 2,
-                "Enabled" : True,
-                "AngularRandomWalk": 0.3,
-                "GyroBiasStabilityTau": 500,
-                "GyroBiasStability": 4.6,
-                "VelocityRandomWalk": 0.24,
-                "AccelBiasStabilityTau": 800,
-                "AccelBiasStability": 36
-            }
-      }
     }
-  }
 }
 
 AIRSIM_SETTINGS_TEMPLATE_2UAV = {
@@ -200,55 +215,62 @@ AIRSIM_SETTINGS_TEMPLATE_2UAV = {
         "Cameras": []
     },
     "Vehicles": {
-    "Drone_1": {
-      "VehicleType": "SimpleFlight",
-      "UseSerial": False,
-      "LockStep": True,
-      "AutoCreate": True,
-      "X": 0,
-      "Y": 0,
-      "Z": 0,
-      "Roll": 0,
-      "Pitch": 0,
-      "Yaw": 0,
-      "Cameras": {
-        "FrontCamera": {
-          "X": 1,
-          "Y": 0,
-          "Z": 0,
-          "Pitch": 0,
-          "Roll": 0,
-          "Yaw": 0,
-          "CaptureSettings": [
-            {
-              "ImageType": 0,
-              "Width": 1024,
-              "Height": 1024,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
+        "Drone_1": {
+            "VehicleType": "SimpleFlight",
+            "UseSerial": False,
+            "LockStep": True,
+            "AutoCreate": True,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "Roll": 0,
+            "Pitch": 0,
+            "Yaw": 0,
+            "Cameras": {
+                "FrontCamera": {
+                    "X":
+                    1,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    0,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 1024,
+                        "Height": 1024,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 1024,
+                        "Height": 1024,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                }
             },
-            {
-              "ImageType": 2,
-              "Width": 1024,
-              "Height": 1024,
-              "FOV_Degrees": 90,
-              "AutoExposureMaxBrightness": 1,
-              "AutoExposureMinBrightness": 0.03
-            }
-          ]
-        }
-      },
-      "Sensors": {
-            "Lidar": {
+            "Sensors": {
+                "Lidar": {
                     "SensorType": 6,
-                    "Enabled" : True,
+                    "Enabled": True,
                     "NumberOfChannels": 4,
                     "RotationsPerSecond": 10,
                     "PointsPerSecond": 1440,
                     "Range": 4,
-                    "X": 0, "Y": 0, "Z": -1,
-                    "Roll": 0, "Pitch": 90, "Yaw" : 0,
+                    "X": 0,
+                    "Y": 0,
+                    "Z": -1,
+                    "Roll": 0,
+                    "Pitch": 90,
+                    "Yaw": 0,
                     "VerticalFOVUpper": 20,
                     "VerticalFOVLower": -10,
                     "HorizontalFOVStart": -180,
@@ -256,109 +278,9 @@ AIRSIM_SETTINGS_TEMPLATE_2UAV = {
                     "DrawDebugPoints": True,
                     "DataFrame": "SensorLocalFrame"
                 },
-          "Imu": {
-                "SensorType": 2,
-                "Enabled" : True,
-                "AngularRandomWalk": 0.3,
-                "GyroBiasStabilityTau": 500,
-                "GyroBiasStability": 4.6,
-                "VelocityRandomWalk": 0.24,
-                "AccelBiasStabilityTau": 800,
-                "AccelBiasStability": 36
-            }
-        }
-    },
-    "Drone_2": {
-        "VehicleType": "SimpleFlight",
-        "UseSerial": False,
-        "LockStep": True,
-        "AutoCreate": True,
-        "X": 0,
-        "Y": 0,
-        "Z": 0,
-        "Roll": 0,
-        "Pitch": 0,
-        "Yaw": 0,
-        "Cameras": {
-            "FrontCamera": {
-                "X": 1,
-                "Y": 0,
-                "Z": 0,
-                "Pitch": 0,
-                "Roll": 0,
-                "Yaw": 0,
-                "CaptureSettings": [
-                    {
-                    "ImageType": 0,
-                    "Width": 256,
-                    "Height": 256,
-                    "FOV_Degrees": 90,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    },
-                    {
-                    "ImageType": 2,
-                    "Width": 256,
-                    "Height": 256,
-                    "FOV_Degrees": 90,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    },
-                    {
-                    "ImageType": 5,
-                    "Width": 256,
-                    "Height": 256,
-                    "FOV_Degrees": 90,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    }
-                ]
-            },
-            "BEVCamera": {
-                "X": 0,
-                "Y": 0,
-                "Z": 0,
-                "Pitch": -90,
-                "Roll": 0,
-                "Yaw": 0,
-                "CaptureSettings": [
-                    {
-                    "ImageType": 0,
-                    "Width": 1024,
-                    "Height": 1024,
-                    "FOV_Degrees": 120,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    },
-                    {
-                    "ImageType": 1,
-                    "Width": 1024,
-                    "Height": 1024,
-                    "FOV_Degrees": 120,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    },
-                    {
-                    "ImageType": 5,
-                    "Width": 1024,
-                    "Height": 1024,
-                    "FOV_Degrees": 120,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                    }
-                ],
-                "Gimbal":{
-                    "Stabilization": 1,
-                    "Pitch": -90,
-                    "Roll": 0,
-                    "Yaw": 0
-                }
-            }
-        },
-        "Sensors": {
-            "Imu": {
+                "Imu": {
                     "SensorType": 2,
-                    "Enabled" : True,
+                    "Enabled": True,
                     "AngularRandomWalk": 0.3,
                     "GyroBiasStabilityTau": 500,
                     "GyroBiasStability": 4.6,
@@ -366,9 +288,113 @@ AIRSIM_SETTINGS_TEMPLATE_2UAV = {
                     "AccelBiasStabilityTau": 800,
                     "AccelBiasStability": 36
                 }
+            }
+        },
+        "Drone_2": {
+            "VehicleType": "SimpleFlight",
+            "UseSerial": False,
+            "LockStep": True,
+            "AutoCreate": True,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "Roll": 0,
+            "Pitch": 0,
+            "Yaw": 0,
+            "Cameras": {
+                "FrontCamera": {
+                    "X":
+                    1,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    0,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    0,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 2,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 5,
+                        "Width": 256,
+                        "Height": 256,
+                        "FOV_Degrees": 90,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }]
+                },
+                "BEVCamera": {
+                    "X":
+                    0,
+                    "Y":
+                    0,
+                    "Z":
+                    0,
+                    "Pitch":
+                    -90,
+                    "Roll":
+                    0,
+                    "Yaw":
+                    0,
+                    "CaptureSettings": [{
+                        "ImageType": 0,
+                        "Width": 1024,
+                        "Height": 1024,
+                        "FOV_Degrees": 120,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 1,
+                        "Width": 1024,
+                        "Height": 1024,
+                        "FOV_Degrees": 120,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }, {
+                        "ImageType": 5,
+                        "Width": 1024,
+                        "Height": 1024,
+                        "FOV_Degrees": 120,
+                        "AutoExposureMaxBrightness": 1,
+                        "AutoExposureMinBrightness": 0.03
+                    }],
+                    "Gimbal": {
+                        "Stabilization": 1,
+                        "Pitch": -90,
+                        "Roll": 0,
+                        "Yaw": 0
+                    }
+                }
+            },
+            "Sensors": {
+                "Imu": {
+                    "SensorType": 2,
+                    "Enabled": True,
+                    "AngularRandomWalk": 0.3,
+                    "GyroBiasStabilityTau": 500,
+                    "GyroBiasStability": 4.6,
+                    "VelocityRandomWalk": 0.24,
+                    "AccelBiasStabilityTau": 800,
+                    "AccelBiasStability": 36
+                }
+            }
         }
     }
-}
 }
 
 known_env_dict = {
@@ -398,42 +424,56 @@ known_env_dict = {
     },
     "Carla_Town01": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town01/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town01/LinuxNoEditor',
     },
     "Carla_Town02": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town02/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town02/LinuxNoEditor',
     },
     "Carla_Town03": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town03/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town03/LinuxNoEditor',
     },
     "Carla_Town04": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town04/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town04/LinuxNoEditor',
     },
     "Carla_Town05": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town05/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town05/LinuxNoEditor',
     },
     "Carla_Town06": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town06/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town06/LinuxNoEditor',
     },
     "Carla_Town07": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town07/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town07/LinuxNoEditor',
     },
     "Carla_Town10HD": {
-        'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town10HD/LinuxNoEditor',
+        'bash_name':
+        'CarlaUE4',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town10HD/LinuxNoEditor',
     },
     "Carla_Town15": {
         'bash_name': 'CarlaUE4',
-        'exec_path': '/nfs/airport/airdrone/carla_town_envs/Town15/LinuxNoEditor',
+        'exec_path':
+        '/nfs/airport/airdrone/carla_town_envs/Town15/LinuxNoEditor',
     },
 }
-def create_drones(drone_num_per_env=1, show_scene=False, uav_mode=True) -> dict:
+
+
+def create_drones(drone_num_per_env=1,
+                  show_scene=False,
+                  uav_mode=True) -> dict:
     if NUM_UAV == 1:
         airsim_settings = copy.deepcopy(AIRSIM_SETTINGS_TEMPLATE)
     elif NUM_UAV == 2:
@@ -442,9 +482,10 @@ def create_drones(drone_num_per_env=1, show_scene=False, uav_mode=True) -> dict:
     airsim_settings = generate_camera_setting(airsim_settings)
     return airsim_settings
 
+
 def generate_distance_sensor_setting(airsim_config):
-    v_angles = [-10, 0, 10, 20]  
-    h_angles = list(range(0, 360, 10)) 
+    v_angles = [-10, 0, 10, 20]
+    h_angles = list(range(0, 360, 10))
 
     for v in v_angles:
         for h in h_angles:
@@ -452,47 +493,56 @@ def generate_distance_sensor_setting(airsim_config):
             airsim_config["Vehicles"]["Drone_1"]["Sensors"][sensor_name] = {
                 "SensorType": 5,  # Distance Sensor类型
                 "Enabled": True,
-                "Range": 4.0,     # 最大探测范围
-                "X": 0, "Y": 0, "Z": 0,
+                "Range": 4.0,  # 最大探测范围
+                "X": 0,
+                "Y": 0,
+                "Z": 0,
                 "Roll": 0,
-                "Pitch": v,       # 垂直角度
-                "Yaw": h,         # 水平角度
+                "Pitch": v,  # 垂直角度
+                "Yaw": h,  # 水平角度
                 "DataFrame": "SensorLocalFrame"
             }
 
     return airsim_config
 
+
 def generate_camera_setting(airsim_config):
     yaw_list = list(range(0, 360, 10))
     for yaw in yaw_list:
-        x,y = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+        x, y = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
         sensor_name = f"Camera_{yaw}"
         airsim_config["Vehicles"]["Drone_1"]["Cameras"][sensor_name] = {
-            "X": x, "Y": y, "Z": 0,
-            "Pitch": 0,
-            "Roll": 0,
-            "Yaw": yaw,
-            "CaptureSettings": [
-                {
-                    "ImageType": 0,
-                    "Width": 1024,
-                    "Height": 1024,
-                    "FOV_Degrees": 90,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                },
-                {
-                    "ImageType": 2,
-                    "Width": 1024,
-                    "Height": 1024,
-                    "FOV_Degrees": 90,
-                    "AutoExposureMaxBrightness": 1,
-                    "AutoExposureMinBrightness": 0.03
-                }
-            ]
+            "X":
+            x,
+            "Y":
+            y,
+            "Z":
+            0,
+            "Pitch":
+            0,
+            "Roll":
+            0,
+            "Yaw":
+            yaw,
+            "CaptureSettings": [{
+                "ImageType": 0,
+                "Width": 1024,
+                "Height": 1024,
+                "FOV_Degrees": 90,
+                "AutoExposureMaxBrightness": 1,
+                "AutoExposureMinBrightness": 0.03
+            }, {
+                "ImageType": 2,
+                "Width": 1024,
+                "Height": 1024,
+                "FOV_Degrees": 90,
+                "AutoExposureMaxBrightness": 1,
+                "AutoExposureMinBrightness": 0.03
+            }]
         }
 
     return airsim_config
+
 
 def pid_exists(pid) -> bool:
     """
@@ -520,24 +570,22 @@ def pid_exists(pid) -> bool:
 
 
 def FromPortGetPid(port: int):
-    subprocess_execute = "netstat -nlp | grep {}".format(
-        port,
-    )
+    subprocess_execute = "netstat -nlp | grep {}".format(port, )
 
     try:
         p = subprocess.Popen(
             subprocess_execute,
-            stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            stdin=None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             shell=True,
         )
     except Exception as e:
-        print(
-            "{}\t{}\t{}".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-                'FromPortGetPid',
-                e,
-            )
-        )
+        print("{}\t{}\t{}".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
+            'FromPortGetPid',
+            e,
+        ))
         return None
     except:
         return None
@@ -588,7 +636,9 @@ def KillPorts(ports) -> None:
         KillPid(pid)
 
     for index, port in enumerate(ports):
-        thread = threading.Thread(target=_kill_port, args=(index, port), daemon=True)
+        thread = threading.Thread(target=_kill_port,
+                                  args=(index, port),
+                                  daemon=True)
         threads.append(thread)
     for thread in threads:
         thread.start()
@@ -605,17 +655,17 @@ def KillAirVLN() -> None:
     try:
         p = subprocess.Popen(
             subprocess_execute,
-            stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            stdin=None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             shell=True,
         )
     except Exception as e:
-        print(
-            "{}\t{}\t{}".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-                'KillAirVLN',
-                e,
-            )
-        )
+        print("{}\t{}\t{}".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
+            'KillAirVLN',
+            e,
+        ))
         return
     except:
         return
@@ -631,12 +681,11 @@ def KillAirVLN() -> None:
 
 
 class EventHandler(object):
+
     def __init__(self):
         scene_ports = []
         for i in range(1000):
-            scene_ports.append(
-                int(args.port) + (i+1)
-            )
+            scene_ports.append(int(args.port) + (i + 1))
         self.scene_ports = scene_ports
 
         scene_gpus = []
@@ -645,27 +694,20 @@ class EventHandler(object):
         self.scene_gpus = scene_gpus
 
         self.scene_used_ports = []
-        
+
         self.port_to_scene = {}
 
     def ping(self) -> bool:
         return True
 
-    def _open_scenes(self, ip: str , scen_id_gpu_list: list):
-        print(
-            "{}\t关闭场景中".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
+    def _open_scenes(self, ip: str, scen_id_gpu_list: list):
+        print("{}\t关闭场景中".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
         KillPorts(self.scene_used_ports)
         self.scene_used_ports = []
         # KillAirVLN()
-        print(
-            "{}\t已关闭所有场景".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
-
+        print("{}\t已关闭所有场景".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
 
         # Occupied airsim port 1
         ports = []
@@ -678,9 +720,11 @@ class EventHandler(object):
 
         KillPorts(ports)
 
-
         # Occupied GPU 2
-        gpus = [scen_id_gpu_list[index][-1] for index in range(len(scen_id_gpu_list))]
+        gpus = [
+            scen_id_gpu_list[index][-1]
+            for index in range(len(scen_id_gpu_list))
+        ]
         print(scen_id_gpu_list)
 
         # search scene path 3
@@ -691,7 +735,8 @@ class EventHandler(object):
                 continue
             if 'Carla' in scen_id:
                 idx = scen_id.split('Town')[-1]
-                SEARCH_ENVs_PATH = Path(f'envs/carla_town_envs/Town{idx}/LinuxNoEditor')
+                SEARCH_ENVs_PATH = Path(
+                    f'envs/carla_town_envs/Town{idx}/LinuxNoEditor')
                 res = glob.glob((str(SEARCH_ENVs_PATH / 'CarlaUE4.sh')))
             else:
                 SEARCH_ENVs_PATH = Path('envs/closeloop_envs')
@@ -701,7 +746,8 @@ class EventHandler(object):
                 choose_env_exe_paths.append(res[0])
             elif scen_id in known_env_dict:
                 env_info = known_env_dict.get(scen_id)
-                res = os.path.join(env_info['exec_path'], env_info['bash_name'] + '.sh')
+                res = os.path.join(env_info['exec_path'],
+                                   env_info['bash_name'] + '.sh')
                 choose_env_exe_paths.append(res)
             else:
                 prefix_flag = False
@@ -709,7 +755,8 @@ class EventHandler(object):
                     if str(scen_id).startswith(map_name):
                         prefix_flag = True
                         env_info = known_env_dict.get(map_name)
-                        res = os.path.join(env_info['exec_path'], env_info['bash_name'] + '.sh')
+                        res = os.path.join(env_info['exec_path'],
+                                           env_info['bash_name'] + '.sh')
                         choose_env_exe_paths.append(res)
                 if not prefix_flag:
                     print(f'can not find sCene file: {scen_id}')
@@ -723,11 +770,17 @@ class EventHandler(object):
             airsim_settings['ApiServerPort'] = int(ports[index])
             self.port_to_scene[ports[index]] = (scen_id, gpu_id)
             airsim_settings_write_content = json.dumps(airsim_settings)
-            if not os.path.exists(str(CWD_DIR / 'airsim_plugin/settings' / str(ports[index]))):
-                os.makedirs(str(CWD_DIR / 'airsim_plugin/settings' / str(ports[index])), exist_ok=True)
-            with open(str(CWD_DIR / 'airsim_plugin/settings' / str(ports[index]) / 'settings.json'), 'w', encoding='utf-8') as dump_f:
+            if not os.path.exists(
+                    str(CWD_DIR / 'airsim_plugin/settings' /
+                        str(ports[index]))):
+                os.makedirs(str(CWD_DIR / 'airsim_plugin/settings' /
+                                str(ports[index])),
+                            exist_ok=True)
+            with open(str(CWD_DIR / 'airsim_plugin/settings' /
+                          str(ports[index]) / 'settings.json'),
+                      'w',
+                      encoding='utf-8') as dump_f:
                 dump_f.write(airsim_settings_write_content)
-
 
             # open scene 5
             if choose_env_exe_paths[index] is None:
@@ -737,7 +790,8 @@ class EventHandler(object):
                 subprocess_execute = "bash {} -RenderOffscreen -NoSound -NoVSync -GraphicsAdapter={} -settings={} ".format(
                     choose_env_exe_paths[index],
                     gpu_id,
-                    str(CWD_DIR / 'airsim_plugin/settings' / str(ports[index]) / 'settings.json'),
+                    str(CWD_DIR / 'airsim_plugin/settings' /
+                        str(ports[index]) / 'settings.json'),
                 )
                 time.sleep(1)
                 print(subprocess_execute)
@@ -745,88 +799,82 @@ class EventHandler(object):
                 try:
                     p = subprocess.Popen(
                         subprocess_execute,
-                        stdin=None, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        stdin=None,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.STDOUT,
                         shell=True,
                     )
                     p_s.append(p)
                 except Exception as e:
-                    print(
-                        "{}\t{}".format(
-                            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-                            e,
-                        )
-                    )
+                    print("{}\t{}".format(
+                        str(
+                            time.strftime("%Y-%m-%d %H:%M:%S",
+                                          time.localtime())),
+                        e,
+                    ))
                     return False, None
                 except:
                     return False, None
         time.sleep(10)
         # ChangeNice(ports)
         self.scene_used_ports += copy.deepcopy(ports)
-        
+
         print("finished", ip)
 
         return True, (ip, ports)
-    
+
     def reopen_scene_from_port(self, port):
-        
-        
+
         KillPorts([port])
-        
+
         scene_id, gpu_id = self.port_to_scene[port]
         res = glob.glob((str(SEARCH_ENVs_PATH / (scene_id + '.sh'))))
         env_path = res[0]
-        
+
         subprocess_execute = "bash {} -RenderOffscreen -NoSound -NoVSync -GraphicsAdapter={} -settings={} ".format(
-                    env_path,
-                    gpu_id,
-                    str(CWD_DIR / 'airsim_plugin/settings' / str(port) / 'settings.json'),
-                )
+            env_path,
+            gpu_id,
+            str(CWD_DIR / 'airsim_plugin/settings' / str(port) /
+                'settings.json'),
+        )
         time.sleep(1)
         print(subprocess_execute)
-        
+
         p = subprocess.Popen(
-                        subprocess_execute,
-                        stdin=None, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                        shell=True,
-                    )
-        
+            subprocess_execute,
+            stdin=None,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+            shell=True,
+        )
 
     def reopen_scenes(self, ip: str, scen_id_gpu_list: list):
-        print(
-            "{}\tSTART reopen_scenes".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
+        print("{}\tSTART reopen_scenes".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
         try:
             print(scen_id_gpu_list)
             ip = ip
             for item in scen_id_gpu_list:
                 # print(item)
                 # TODO: don't know why item is int
-                if type(item[0]) is not str: 
+                if type(item[0]) is not str:
                     item[0] = item[0].decode('utf-8')
             result = self._open_scenes(ip, scen_id_gpu_list)
         except Exception as e:
             print(e)
             exe_type, exe_value, exe_traceback = sys.exc_info()
-            exe_info_list = traceback.format_exception(
-                exe_type, exe_value, exe_traceback)
+            exe_info_list = traceback.format_exception(exe_type, exe_value,
+                                                       exe_traceback)
             tracebacks = ''.join(exe_info_list)
             print('traceback:', tracebacks)
             result = False, None
-        print(
-            "{}\tEND reopen_scenes".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
+        print("{}\tEND reopen_scenes".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
         return result
 
     def close_scenes(self, ip: str) -> bool:
-        print(
-            "{}\tSTART close_scenes".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
+        print("{}\tSTART close_scenes".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
 
         try:
             KillPorts(self.scene_used_ports)
@@ -839,20 +887,18 @@ class EventHandler(object):
             print(e)
             result = False
 
-        print(
-            "{}\tEND close_scenes".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-            )
-        )
+        print("{}\tEND close_scenes".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())), ))
         return result
 
 
 def serve_background(server, daemon=False):
+
     def _start_server(server):
         server.start()
         server.close()
 
-    t = threading.Thread(target=_start_server, args=(server,))
+    t = threading.Thread(target=_start_server, args=(server, ))
     t.setDaemon(daemon)
     t.start()
     return t
@@ -868,7 +914,7 @@ def serve(daemon=False):
 
         return addr, server, thread
     except Exception as err:
-        print("error",err)
+        print("error", err)
         pass
 
 
@@ -880,34 +926,25 @@ if __name__ == '__main__':
         type=str,
         default='3',
     )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=50500,
-        help='server port'
-    ) 
-    parser.add_argument(
-        "--num_uav",
-        type=int,
-        default=2,
-        help="the number of UAVs"
-    )
-    
+    parser.add_argument("--port", type=int, default=50500, help='server port')
+    parser.add_argument("--num_uav",
+                        type=int,
+                        default=2,
+                        help="the number of UAVs")
 
     args = parser.parse_args()
-
 
     HOST = '127.0.0.1'
     PORT = int(args.port)
     CWD_DIR = Path(str(os.getcwd())).resolve()
     PROJECT_ROOT_DIR = CWD_DIR.parent.parent.parent
-    print("PROJECT_ROOT_DIR",PROJECT_ROOT_DIR)
-    # SEARCH_ENVs_PATH = PROJECT_ROOT_DIR / 'envs/anew_test/ghx/BrushifyCountryRoads_612_zichan/'  # TODO 
+    print("PROJECT_ROOT_DIR", PROJECT_ROOT_DIR)
+    # SEARCH_ENVs_PATH = PROJECT_ROOT_DIR / 'envs/anew_test/ghx/BrushifyCountryRoads_612_zichan/'  # TODO
     SEARCH_ENVs_PATH = Path('envs/closeloop_envs')
     assert os.path.exists(str(SEARCH_ENVs_PATH)), 'error'
 
     gpu_list = []
-    gpus = str(args.gpus).split(',') 
+    gpus = str(args.gpus).split(',')
     for gpu in gpus:
         gpu_list.append(int(gpu.strip()))
     GPU_IDS = gpu_list.copy()
@@ -916,4 +953,3 @@ if __name__ == '__main__':
 
     addr, server, thread = serve()
     print(f"start listening \t{addr._host}:{addr._port}")
-

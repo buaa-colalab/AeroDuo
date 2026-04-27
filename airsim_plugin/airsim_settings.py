@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Dict, Union
+
 import attr
 
 
@@ -8,9 +9,8 @@ class Singleton(type):
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(
-                *args, **kwargs
-            )
+            cls._instances[cls] = super(Singleton,
+                                        cls).__call__(*args, **kwargs)
         return cls._instances[cls]
 
 
@@ -65,4 +65,5 @@ class _DefaultAirsimActionSettings(Dict):
 
 
 AirsimActions: AirsimActionsSingleton = AirsimActionsSingleton()
-AirsimActionSettings: _DefaultAirsimActionSettings = _DefaultAirsimActionSettings()
+AirsimActionSettings: _DefaultAirsimActionSettings = _DefaultAirsimActionSettings(
+)

@@ -1,17 +1,17 @@
-import sys
+import json
+import math
 import re
 import string
-import json
+import sys
 import time
-import math
 from collections import Counter, defaultdict
-import numpy as np
+
 import networkx as nx
+import numpy as np
 from numpy.linalg import norm
 
 from src.common.param import args
 from utils.logger import logger
-
 
 # padding, unknown word, end of sentence
 base_vocab = ['<PAD>', '<UNK>']
@@ -33,14 +33,19 @@ def load_nav_graphs(scans):
             G = nx.Graph()
             positions = {}
             data = json.load(f)
-            for i,item in enumerate(data):
+            for i, item in enumerate(data):
                 if item['included']:
-                    for j,conn in enumerate(item['unobstructed']):
+                    for j, conn in enumerate(item['unobstructed']):
                         if conn and data[j]['included']:
-                            positions[item['image_id']] = np.array([item['pose'][3],
-                                    item['pose'][7], item['pose'][11]]);
-                            assert data[j]['unobstructed'][i], 'Graph should be undirected'
-                            G.add_edge(item['image_id'],data[j]['image_id'],weight=distance(item,data[j]))
+                            positions[item['image_id']] = np.array([
+                                item['pose'][3], item['pose'][7],
+                                item['pose'][11]
+                            ])
+                            assert data[j]['unobstructed'][
+                                i], 'Graph should be undirected'
+                            G.add_edge(item['image_id'],
+                                       data[j]['image_id'],
+                                       weight=distance(item, data[j]))
             nx.set_node_attributes(G, values=positions, name='position')
             graphs[scan] = G
     return graphs
@@ -76,13 +81,13 @@ def load_datasets(splits):
 
         # Partition
         if number > 0:
-            random.seed(1)              # Make the data deterministic, additive
+            random.seed(1)  # Make the data deterministic, additive
             random.shuffle(new_data)
             new_data = new_data[:number]
 
         # Join
         data += new_data
-    random.setstate(old_state)      # Recover the state of the random generator
+    random.setstate(old_state)  # Recover the state of the random generator
     return data
 
 
@@ -117,27 +122,27 @@ def load_my_datasets(splits):
 
         # Partition
         if number > 0:
-            random.seed(1)              # Make the data deterministic, additive
+            random.seed(1)  # Make the data deterministic, additive
             random.shuffle(new_data)
             new_data = new_data[:number]
 
         # Join
         data += new_data
-    random.setstate(old_state)      # Recover the state of the random generator
+    random.setstate(old_state)  # Recover the state of the random generator
     return data
 
 
 def pad_instr_tokens(instr_tokens, maxlength=20):
 
-    if len(instr_tokens) <= 2: #assert len(raw_instr_tokens) > 2
+    if len(instr_tokens) <= 2:  #assert len(raw_instr_tokens) > 2
         return None
 
-    if len(instr_tokens) > maxlength - 2: # -2 for [CLS] and [SEP]
-        instr_tokens = instr_tokens[:(maxlength-2)]
+    if len(instr_tokens) > maxlength - 2:  # -2 for [CLS] and [SEP]
+        instr_tokens = instr_tokens[:(maxlength - 2)]
 
     instr_tokens = ['[CLS]'] + instr_tokens + ['[SEP]']
     num_words = len(instr_tokens)  # - 1  # include [SEP]
-    instr_tokens += ['[PAD]'] * (maxlength-len(instr_tokens))
+    instr_tokens += ['[PAD]'] * (maxlength - len(instr_tokens))
 
     assert len(instr_tokens) == maxlength
 
@@ -146,7 +151,8 @@ def pad_instr_tokens(instr_tokens, maxlength=20):
 
 class Tokenizer(object):
     ''' Class to tokenize and encode a sentence. '''
-    SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)') # Split on any non-alphanumeric character
+    SENTENCE_SPLIT_REGEX = re.compile(
+        r'(\W+)')  # Split on any non-alphanumeric character
 
     def __init__(self, vocab=None, encoding_length=300):
         self.encoding_length = encoding_length
@@ -159,7 +165,7 @@ class Tokenizer(object):
         if vocab:
             ori_vocab_length = len(vocab)
 
-            for i,word in enumerate(vocab):
+            for i, word in enumerate(vocab):
                 self.word_to_index[word] = i
             new_w2i = defaultdict(lambda: self.word_to_index['<UNK>'])
             new_w2i.update(self.word_to_index)
@@ -181,20 +187,26 @@ class Tokenizer(object):
         """
         This is used for debug
         """
-        self.word_to_index = dict(self.word_to_index)   # To avoid using mis-typing tokens
+        self.word_to_index = dict(
+            self.word_to_index)  # To avoid using mis-typing tokens
 
     def add_word(self, word):
         assert word not in self.word_to_index
-        self.word_to_index[word] = self.vocab_size()    # vocab_size() is the
+        self.word_to_index[word] = self.vocab_size()  # vocab_size() is the
         self.index_to_word[self.vocab_size()] = word
 
     @staticmethod
     def split_sentence(sentence):
         ''' Break sentence into a list of words and punctuation '''
         toks = []
-        for word in [s.strip().lower() for s in Tokenizer.SENTENCE_SPLIT_REGEX.split(sentence.strip()) if len(s.strip()) > 0]:
+        for word in [
+                s.strip().lower()
+                for s in Tokenizer.SENTENCE_SPLIT_REGEX.split(sentence.strip())
+                if len(s.strip()) > 0
+        ]:
             # Break up any words containing punctuation only, e.g. '!?', unless it is multiple full stops e.g. '..'
-            if all(c in string.punctuation for c in word) and not all(c in '.' for c in word):
+            if all(c in string.punctuation
+                   for c in word) and not all(c in '.' for c in word):
                 toks += list(word)
             else:
                 toks.append(word)
@@ -221,7 +233,8 @@ class Tokenizer(object):
         #assert len(encoding) > 2
 
         if len(encoding) < max_length:
-            encoding += [self.word_to_index['<PAD>']] * (max_length-len(encoding))  # Padding
+            encoding += [self.word_to_index['<PAD>']] * (
+                max_length - len(encoding))  # Padding
         elif len(encoding) > max_length:
             pass
 
@@ -244,17 +257,19 @@ class Tokenizer(object):
         :return:  Remove the potential <BOS> and <EOS>
                   If no <EOS> return empty list
         """
-        raise  NotImplementedError
+        raise NotImplementedError
 
         if len(inst) == 0:
             return inst
-        end = np.argmax(np.array(inst) == self.word_to_index['<EOS>'])     # If no <EOS>, return empty string
+        end = np.argmax(
+            np.array(inst) ==
+            self.word_to_index['<EOS>'])  # If no <EOS>, return empty string
         if len(inst) > 1 and inst[0] == self.word_to_index['<BOS>']:
             start = 1
         else:
             start = 0
         # print(inst, start, end)
-        return inst[start: end]
+        return inst[start:end]
 
 
 def build_vocab(splits=['train'], min_count=1, start_vocab=base_vocab):
@@ -266,7 +281,7 @@ def build_vocab(splits=['train'], min_count=1, start_vocab=base_vocab):
         for instr in item['instructions']:
             count.update(t.split_sentence(instr))
     vocab = list(start_vocab)
-    for word,num in count.most_common():
+    for word, num in count.most_common():
         if num >= min_count:
             vocab.append(word)
         else:
@@ -275,7 +290,7 @@ def build_vocab(splits=['train'], min_count=1, start_vocab=base_vocab):
 
 
 def write_vocab(vocab, path):
-    print('Writing vocab of size %d to %s' % (len(vocab),path))
+    print('Writing vocab of size %d to %s' % (len(vocab), path))
     with open(path, 'w', encoding='utf-8') as f:
         for word in vocab:
             f.write("%s\n" % word)
@@ -300,9 +315,10 @@ def timeSince(since, percent):
     rs = es - s
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
+
 def read_img_features(feature_store, test_only=False):
-    import csv
     import base64
+    import csv
 
     print("Start loading the image feature ... (~50 seconds)")
     start = time.time()
@@ -314,49 +330,69 @@ def read_img_features(feature_store, test_only=False):
 
     args.views = views
 
-    tsv_fieldnames = ['scanId', 'viewpointId', 'image_w', 'image_h', 'vfov', 'features']
+    tsv_fieldnames = [
+        'scanId', 'viewpointId', 'image_w', 'image_h', 'vfov', 'features'
+    ]
 
     if not test_only:
         features = {}
-        with open(feature_store, "r") as tsv_in_file:     # Open the tsv file.
-            reader = csv.DictReader(tsv_in_file, delimiter='\t', fieldnames=tsv_fieldnames)
+        with open(feature_store, "r") as tsv_in_file:  # Open the tsv file.
+            reader = csv.DictReader(tsv_in_file,
+                                    delimiter='\t',
+                                    fieldnames=tsv_fieldnames)
             for item in reader:
                 long_id = item['scanId'] + "_" + item['viewpointId']
-                features[long_id] = np.frombuffer(base64.decodestring(item['features'].encode('ascii')),
-                                                   dtype=np.float32).reshape((views, -1))   # Feature of long_id is (36, 2048)
+                features[long_id] = np.frombuffer(
+                    base64.decodestring(item['features'].encode('ascii')),
+                    dtype=np.float32).reshape(
+                        (views, -1))  # Feature of long_id is (36, 2048)
     else:
         features = None
 
-    print("Finish Loading the image feature from %s in %0.4f seconds" % (feature_store, time.time() - start))
+    print("Finish Loading the image feature from %s in %0.4f seconds" %
+          (feature_store, time.time() - start))
     return features
 
+
 def read_candidates(candidates_store):
-    import csv
     import base64
+    import csv
     from collections import defaultdict
     print("Start loading the candidate feature")
 
     start = time.time()
 
-    TSV_FIELDNAMES = ['scanId', 'viewpointId', 'heading', 'elevation', 'next', 'pointId', 'idx', 'feature']
+    TSV_FIELDNAMES = [
+        'scanId', 'viewpointId', 'heading', 'elevation', 'next', 'pointId',
+        'idx', 'feature'
+    ]
     candidates = defaultdict(lambda: list())
     items = 0
-    with open(candidates_store, "r") as tsv_in_file:     # Open the tsv file.
-        reader = csv.DictReader(tsv_in_file, delimiter='\t', fieldnames=TSV_FIELDNAMES)
+    with open(candidates_store, "r") as tsv_in_file:  # Open the tsv file.
+        reader = csv.DictReader(tsv_in_file,
+                                delimiter='\t',
+                                fieldnames=TSV_FIELDNAMES)
         for item in reader:
             long_id = item['scanId'] + "_" + item['viewpointId']
-            candidates[long_id].append(
-                {'heading': float(item['heading']),
-                 'elevation': float(item['elevation']),
-                 'scanId': item['scanId'],
-                 'viewpointId': item['next'],
-                 'pointId': int(item['pointId']),
-                 'idx': int(item['idx']) + 1,   # Because a bug in the precompute code, here +1 is important
-                 'feature': np.frombuffer(
-                     base64.decodestring(item['feature'].encode('ascii')),
-                     dtype=np.float32)
-                    }
-            )
+            candidates[long_id].append({
+                'heading':
+                float(item['heading']),
+                'elevation':
+                float(item['elevation']),
+                'scanId':
+                item['scanId'],
+                'viewpointId':
+                item['next'],
+                'pointId':
+                int(item['pointId']),
+                'idx':
+                int(item['idx']) +
+                1,  # Because a bug in the precompute code, here +1 is important
+                'feature':
+                np.frombuffer(base64.decodestring(
+                    item['feature'].encode('ascii')),
+                              dtype=np.float32)
+            })
             items += 1
 
     for long_id in candidates:
@@ -366,29 +402,40 @@ def read_candidates(candidates_store):
 
     # candidate = candidates[long_id]
     # print(candidate)
-    print("Finish Loading the candidates from %s in %0.4f seconds" % (candidates_store, time.time() - start))
+    print("Finish Loading the candidates from %s in %0.4f seconds" %
+          (candidates_store, time.time() - start))
     candidates = dict(candidates)
     return candidates
+
 
 def add_exploration(paths):
     explore = json.load(open("data/exploration.json", 'r'))
     inst2explore = {path['instr_id']: path['trajectory'] for path in explore}
     for path in paths:
-        path['trajectory'] = inst2explore[path['instr_id']] + path['trajectory']
+        path['trajectory'] = inst2explore[
+            path['instr_id']] + path['trajectory']
     return paths
+
 
 def angle_feature(heading, elevation):
 
     import math
+
     # twopi = math.pi * 2
     # heading = (heading + twopi) % twopi     # From 0 ~ 2pi
     # It will be the same
-    return np.array([math.sin(heading), math.cos(heading),
-                     math.sin(elevation), math.cos(elevation)] * (args.angle_feat_size // 4),
+    return np.array([
+        math.sin(heading),
+        math.cos(heading),
+        math.sin(elevation),
+        math.cos(elevation)
+    ] * (args.angle_feat_size // 4),
                     dtype=np.float32)
+
 
 def new_simulator():
     import MatterSim
+
     # Simulator image parameters
     WIDTH = 640
     HEIGHT = 480
@@ -403,6 +450,7 @@ def new_simulator():
 
     return sim
 
+
 def get_point_angle_feature(baseViewId=0):
     sim = new_simulator()
 
@@ -410,11 +458,12 @@ def get_point_angle_feature(baseViewId=0):
     base_heading = (baseViewId % 12) * math.radians(30)
     for ix in range(36):
         if ix == 0:
-            sim.newEpisode('ZMojNkEp431', '2f4d90acd4024c269fb0efe49a8ac540', 0, math.radians(-30))
+            sim.newEpisode('ZMojNkEp431', '2f4d90acd4024c269fb0efe49a8ac540',
+                           0, math.radians(-30))
         elif ix % 12 == 0:
-            sim.makeAction(0, 1.0, 1.0) # 转了一圈
+            sim.makeAction(0, 1.0, 1.0)  # 转了一圈
         else:
-            sim.makeAction(0, 1.0, 0) # 向右旋转
+            sim.makeAction(0, 1.0, 0)  # 向右旋转
 
         state = sim.getState()
         assert state.viewIndex == ix
@@ -424,26 +473,35 @@ def get_point_angle_feature(baseViewId=0):
         feature[ix, :] = angle_feature(heading, state.elevation)
     return feature
 
+
 def get_all_point_angle_feature():
     return [get_point_angle_feature(baseViewId) for baseViewId in range(36)]
 
+
 def add_idx(inst):
     toks = Tokenizer.split_sentence(inst)
-    return " ".join([str(idx)+tok for idx, tok in enumerate(toks)])
+    return " ".join([str(idx) + tok for idx, tok in enumerate(toks)])
+
 
 import signal
-class GracefulKiller:
-  kill_now = False
-  def __init__(self):
-    signal.signal(signal.SIGINT, self.exit_gracefully)
-    signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-  def exit_gracefully(self,signum, frame):
-    self.kill_now = True
+
+class GracefulKiller:
+    kill_now = False
+
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        self.kill_now = True
+
 
 from collections import OrderedDict
 
+
 class Timer:
+
     def __init__(self):
         self.cul = OrderedDict()
         self.start = {}
@@ -471,32 +529,39 @@ class Timer:
         total = sum(self.cul.values())
         for key in self.cul:
             print("%s, total time %0.2f, avg time %0.2f, part of %0.2f" %
-                  (key, self.cul[key], self.cul[key]*1./self.iter, self.cul[key]*1./total))
+                  (key, self.cul[key], self.cul[key] * 1. / self.iter,
+                   self.cul[key] * 1. / total))
         print(total / self.iter)
 
 
-stop_word_list = [
-    ",", ".", "and", "?", "!"
-]
+stop_word_list = [",", ".", "and", "?", "!"]
 
 
 def stop_words_location(inst, mask=False):
     toks = Tokenizer.split_sentence(inst)
-    sws = [i for i, tok in enumerate(toks) if tok in stop_word_list]        # The index of the stop words
-    if len(sws) == 0 or sws[-1] != (len(toks)-1):     # Add the index of the last token
-        sws.append(len(toks)-1)
-    sws = [x for x, y in zip(sws[:-1], sws[1:]) if x+1 != y] + [sws[-1]]    # Filter the adjacent stop word
-    sws_mask = np.ones(len(toks), np.int32)         # Create the mask
+    sws = [i for i, tok in enumerate(toks)
+           if tok in stop_word_list]  # The index of the stop words
+    if len(sws) == 0 or sws[-1] != (len(toks) -
+                                    1):  # Add the index of the last token
+        sws.append(len(toks) - 1)
+    sws = [x for x, y in zip(sws[:-1], sws[1:]) if x + 1 != y
+           ] + [sws[-1]]  # Filter the adjacent stop word
+    sws_mask = np.ones(len(toks), np.int32)  # Create the mask
     sws_mask[sws] = 0
     return sws_mask if mask else sws
 
+
 def get_segments(inst, mask=False):
     toks = Tokenizer.split_sentence(inst)
-    sws = [i for i, tok in enumerate(toks) if tok in stop_word_list]        # The index of the stop words
-    sws = [-1] + sws + [len(toks)]      # Add the <start> and <end> positions
-    segments = [toks[sws[i]+1:sws[i+1]] for i in range(len(sws)-1)]       # Slice the segments from the tokens
-    segments = list(filter(lambda x: len(x)>0, segments))     # remove the consecutive stop words
+    sws = [i for i, tok in enumerate(toks)
+           if tok in stop_word_list]  # The index of the stop words
+    sws = [-1] + sws + [len(toks)]  # Add the <start> and <end> positions
+    segments = [toks[sws[i] + 1:sws[i + 1]] for i in range(len(sws) - 1)
+                ]  # Slice the segments from the tokens
+    segments = list(filter(lambda x: len(x) > 0,
+                           segments))  # remove the consecutive stop words
     return segments
+
 
 def clever_pad_sequence(sequences, batch_first=True, padding_value=0):
     max_size = sequences[0].size()
@@ -518,13 +583,18 @@ def clever_pad_sequence(sequences, batch_first=True, padding_value=0):
 
     return out_tensor
 
+
 import torch
+
+
 def length2mask(length, size=None):
     batch_size = len(length)
     size = 1 if size is None else size
-    mask = (torch.arange(size, dtype=torch.int64).unsqueeze(0).repeat(batch_size, 1)
-                > (torch.LongTensor(length) - 1).unsqueeze(1)).cuda()
+    mask = (torch.arange(size,
+                         dtype=torch.int64).unsqueeze(0).repeat(batch_size, 1)
+            > (torch.LongTensor(length) - 1).unsqueeze(1)).cuda()
     return mask
+
 
 def average_length(path2inst):
     length = []
@@ -534,10 +604,14 @@ def average_length(path2inst):
         length.append(len(datum))
     return sum(length) / len(length)
 
+
 def tile_batch(tensor, multiplier):
     _, *s = tensor.size()
-    tensor = tensor.unsqueeze(1).expand(-1, multiplier, *(-1,) * len(s)).contiguous().view(-1, *s)
+    tensor = tensor.unsqueeze(1).expand(-1, multiplier,
+                                        *(-1, ) * len(s)).contiguous().view(
+                                            -1, *s)
     return tensor
+
 
 def viewpoint_drop_mask(viewpoint, seed=None, drop_func=None):
     local_seed = hash(viewpoint) ^ seed
@@ -547,9 +621,10 @@ def viewpoint_drop_mask(viewpoint, seed=None, drop_func=None):
 
 
 class FloydGraph:
+
     def __init__(self):
-        self._dis = defaultdict(lambda :defaultdict(lambda: 95959595))
-        self._point = defaultdict(lambda :defaultdict(lambda: ""))
+        self._dis = defaultdict(lambda: defaultdict(lambda: 95959595))
+        self._point = defaultdict(lambda: defaultdict(lambda: ""))
         self._visited = set()
 
     def distance(self, x, y):
@@ -587,7 +662,7 @@ class FloydGraph:
         """
         if x == y:
             return []
-        if self._point[x][y] == "":     # Direct edge
+        if self._point[x][y] == "":  # Direct edge
             return [y]
         else:
             k = self._point[x][y]
@@ -597,7 +672,13 @@ class FloydGraph:
             #         print(x1, x2, "%.4f" % self._dis[x1][x2])
             return self.path(x, k) + self.path(k, y)
 
-def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
+
+def print_progress(iteration,
+                   total,
+                   prefix='',
+                   suffix='',
+                   decimals=1,
+                   bar_length=100):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -613,11 +694,13 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
     filled_length = int(round(bar_length * iteration / float(total)))
     bar = '█' * filled_length + '-' * (bar_length - filled_length)
 
-    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+    sys.stdout.write('\r%s |%s| %s%s %s' %
+                     (prefix, bar, percents, '%', suffix)),
 
     if iteration == total:
         sys.stdout.write('\n')
     sys.stdout.flush()
+
 
 def ndtw_initialize():
     ndtw_criterion = {}
@@ -633,6 +716,7 @@ def ndtw_initialize():
             ndtw_graph = ndtw_graphload(path_scan_id)
             ndtw_criterion[path_scan_id] = DTW(ndtw_graph)
     return ndtw_criterion
+
 
 def ndtw_graphload(scan):
     """Loads a networkx graph for a given scan.
@@ -667,8 +751,9 @@ def ndtw_graphload(scan):
 
     return graph
 
+
 class DTW(object):
-  """Dynamic Time Warping (DTW) evaluation metrics.
+    """Dynamic Time Warping (DTW) evaluation metrics.
   Python doctest:
   >>> graph = nx.grid_graph([3, 4])
   >>> prediction = [(0, 0), (1, 0), (2, 0), (3, 0)]
@@ -680,21 +765,21 @@ class DTW(object):
   >>> assert np.isclose(dtw(prediction[:2], reference, 'sdtw'), 0.0)
   """
 
-  def __init__(self, graph, weight='weight', threshold=3.0):
-    """Initializes a DTW object.
+    def __init__(self, graph, weight='weight', threshold=3.0):
+        """Initializes a DTW object.
     Args:
       graph: networkx graph for the environment.
       weight: networkx edge weight key (str).
       threshold: distance threshold $d_{th}$ (float).
     """
-    self.graph = graph
-    self.weight = weight
-    self.threshold = threshold
-    self.distance = dict(
-        nx.all_pairs_dijkstra_path_length(self.graph, weight=self.weight))
+        self.graph = graph
+        self.weight = weight
+        self.threshold = threshold
+        self.distance = dict(
+            nx.all_pairs_dijkstra_path_length(self.graph, weight=self.weight))
 
-  def __call__(self, prediction, reference, metric='sdtw'):
-    """Computes DTW metrics.
+    def __call__(self, prediction, reference, metric='sdtw'):
+        """Computes DTW metrics.
     Args:
       prediction: list of nodes (str), path predicted by agent.
       reference: list of nodes (str), the ground truth path.
@@ -702,24 +787,27 @@ class DTW(object):
     Returns:
       the DTW between the prediction and reference path (float).
     """
-    assert metric in ['ndtw', 'sdtw', 'dtw']
+        assert metric in ['ndtw', 'sdtw', 'dtw']
 
-    dtw_matrix = np.inf * np.ones((len(prediction) + 1, len(reference) + 1))
-    dtw_matrix[0][0] = 0
-    for i in range(1, len(prediction)+1):
-      for j in range(1, len(reference)+1):
-        best_previous_cost = min(
-            dtw_matrix[i-1][j], dtw_matrix[i][j-1], dtw_matrix[i-1][j-1])
-        cost = self.distance[prediction[i-1]][reference[j-1]]
-        dtw_matrix[i][j] = cost + best_previous_cost
-    dtw = dtw_matrix[len(prediction)][len(reference)]
+        dtw_matrix = np.inf * np.ones(
+            (len(prediction) + 1, len(reference) + 1))
+        dtw_matrix[0][0] = 0
+        for i in range(1, len(prediction) + 1):
+            for j in range(1, len(reference) + 1):
+                best_previous_cost = min(dtw_matrix[i - 1][j],
+                                         dtw_matrix[i][j - 1],
+                                         dtw_matrix[i - 1][j - 1])
+                cost = self.distance[prediction[i - 1]][reference[j - 1]]
+                dtw_matrix[i][j] = cost + best_previous_cost
+        dtw = dtw_matrix[len(prediction)][len(reference)]
 
-    if metric == 'dtw':
-      return dtw
+        if metric == 'dtw':
+            return dtw
 
-    ndtw = np.exp(-dtw/(self.threshold * len(reference)))
-    if metric == 'ndtw':
-      return ndtw
+        ndtw = np.exp(-dtw / (self.threshold * len(reference)))
+        if metric == 'ndtw':
+            return ndtw
 
-    success = self.distance[prediction[-1]][reference[-1]] <= self.threshold
-    return success * ndtw
+        success = self.distance[prediction[-1]][
+            reference[-1]] <= self.threshold
+        return success * ndtw

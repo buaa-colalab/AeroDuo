@@ -1,32 +1,22 @@
+import copy
 import signal
 from multiprocessing.connection import Connection
 from multiprocessing.context import BaseContext
 from threading import Thread
-from typing import (
-    Any,
-    Callable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
-import numpy as np
+from typing import Any, Callable, List, Optional, Tuple, Union, cast
+
 import attr
-import copy
+import numpy as np
 
 from src.common.param import args
-
-from utils.pickle5_multiprocessing import ConnectionWrapper
 from utils.env_utils_uav import ENV
 from utils.logger import logger
-
+from utils.pickle5_multiprocessing import ConnectionWrapper
 
 COMMAND_CLOSE = "close"
 COMMAND_SET_BATCH = "set_batch"
 COMMAND_GET_OBS = "get_obs_at"
 COMMAND_GET_COLLISION_SENSOR = 'get_collision_sensor'
-
 
 try:
     # Use torch.multiprocessing if we can.
@@ -51,10 +41,8 @@ class _ReadWrapper:
 
     def __call__(self) -> Any:
         if not self.is_waiting:
-            raise RuntimeError(
-                f"Tried to read from process {self.rank}"
-                " but there is nothing waiting to be read"
-            )
+            raise RuntimeError(f"Tried to read from process {self.rank}"
+                               " but there is nothing waiting to be read")
         res = self.read_fn()
         self.is_waiting = False
 
@@ -74,8 +62,7 @@ class _WriteWrapper:
         if self.read_wrapper.is_waiting:
             raise RuntimeError(
                 f"Tried to write to process {self.read_wrapper.rank}"
-                " but the last write has not been read"
-            )
+                " but the last write has not been read")
         self.write_fn(data)
         self.read_wrapper.is_waiting = True
 
@@ -148,9 +135,7 @@ class VectorEnvUtil:
             signal.signal(signal.SIGUSR1, signal.SIG_IGN)
             signal.signal(signal.SIGUSR2, signal.SIG_IGN)
 
-        env = ENV(
-            load_scenes=env_fn_args['load_scenes'],
-        )
+        env = ENV(load_scenes=env_fn_args['load_scenes'], )
 
         if parent_pipe is not None:
             parent_pipe.close()
@@ -164,14 +149,15 @@ class VectorEnvUtil:
 
                 elif command == COMMAND_GET_OBS:
                     index, state = data
-                    (teacher_action, done, oracle_success), state = env.get_obs_at(index, state)
+                    (teacher_action, done,
+                     oracle_success), state = env.get_obs_at(index, state)
                     connection_write_fn(
-                        ((teacher_action, done, oracle_success), state)
-                    )
+                        ((teacher_action, done, oracle_success), state))
 
                 elif command == COMMAND_GET_COLLISION_SENSOR:
                     index, state = data
-                    is_collision = env.get_collision_sensor_result_at(index, state)
+                    is_collision = env.get_collision_sensor_result_at(
+                        index, state)
                     connection_write_fn(bool(is_collision))
 
                 else:
@@ -183,7 +169,8 @@ class VectorEnvUtil:
         except Exception as e:
             logger.error(e)
             try:
-                logger.error('command is: {} \t data is: {}'.format(command, data))
+                logger.error('command is: {} \t data is: {}'.format(
+                    command, data))
             except:
                 pass
         finally:
@@ -196,13 +183,11 @@ class VectorEnvUtil:
         workers_ignore_signals: bool = False,
     ) -> Tuple[List[_ReadWrapper], List[_WriteWrapper]]:
         parent_connections, worker_connections = zip(
-            *[
-                [ConnectionWrapper(c) for c in self._mp_ctx.Pipe(duplex=True)]
-                for _ in range(self._num_envs)
-            ]
-        )
+            *[[ConnectionWrapper(c) for c in self._mp_ctx.Pipe(duplex=True)]
+              for _ in range(self._num_envs)])
         self._workers = []
-        for worker_conn, parent_conn in zip(worker_connections, parent_connections):
+        for worker_conn, parent_conn in zip(worker_connections,
+                                            parent_connections):
             ps = self._mp_ctx.Process(
                 target=self._worker_env,
                 args=(
@@ -237,7 +222,7 @@ class VectorEnvUtil:
         for read_fn in self._connection_read_fns:
             if read_fn.is_waiting:
                 read_fn()
-                
+
         for write_fn in self._connection_write_fns:
             write_fn((COMMAND_CLOSE, ''))
 
@@ -255,21 +240,19 @@ class VectorEnvUtil:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-
     def set_batch(self, batch):
         self.batch = copy.deepcopy(batch)
 
         for index in range(self._num_envs):
             self._connection_write_fns[index](
-                (COMMAND_SET_BATCH, copy.deepcopy(batch))
-            )
+                (COMMAND_SET_BATCH, copy.deepcopy(batch)))
 
         results = [
-            self._connection_read_fns[index]() for index in range(self._num_envs)
+            self._connection_read_fns[index]()
+            for index in range(self._num_envs)
         ]
 
         return
-
 
     def get_obs(self, obs_states) -> Tuple[List[Any], List[Any]]:
         self.obs_states = obs_states
@@ -277,30 +260,36 @@ class VectorEnvUtil:
         for index in range(len(obs_states)):
             _, _, state, _, _ = obs_states[index]
             self._connection_write_fns[index](
-                (COMMAND_GET_OBS, (index, state))
-            )
+                (COMMAND_GET_OBS, (index, state)))
 
         results = [
-            self._connection_read_fns[index]() for index in range(len(obs_states))
+            self._connection_read_fns[index]()
+            for index in range(len(obs_states))
         ]
 
         obs = []
         sim_states = []
         for index in range(len(obs_states)):
             (teacher_action, done, oracle_success), sim_state = results[index]
-            self.obs_states[index] = (obs_states[index][0], obs_states[index][1], sim_state, obs_states[index][3], obs_states[index][4])
+            self.obs_states[index] = (obs_states[index][0],
+                                      obs_states[index][1], sim_state,
+                                      obs_states[index][3],
+                                      obs_states[index][4])
 
             obs.append(
-                self._format_obs_at(index, teacher_action, done, oracle_success)
-            )
+                self._format_obs_at(index, teacher_action, done,
+                                    oracle_success))
             sim_states.append(sim_state)
 
         return obs, sim_states
 
-    def _format_obs_at(self, index: int, teacher_waypoints, done, oracle_success):
-        rgb_images, depth_images, sim_state, bev, bev_depth = self.obs_states[index]
+    def _format_obs_at(self, index: int, teacher_waypoints, done,
+                       oracle_success):
+        rgb_images, depth_images, sim_state, bev, bev_depth = self.obs_states[
+            index]
         observations = [info for info in sim_state.trajectory[-5:]]
-        observations[-1]['instruction'] = sim_state.raw_trajectory_info['instruction']
+        observations[-1]['instruction'] = sim_state.raw_trajectory_info[
+            'instruction']
         # observations[-1]['trajectory_dir'] = sim_state.raw_trajectory_info['trajectory_dir']
         observations[-1]['teacher_action'] = teacher_waypoints
         observations[-1]['rgb'] = rgb_images
@@ -311,16 +300,13 @@ class VectorEnvUtil:
 
         return observations, done, collision, oracle_success
 
-
     def get_collision_sensor(self, states) -> List[Any]:
         for index in range(len(states)):
             self._connection_write_fns[index](
-                (COMMAND_GET_COLLISION_SENSOR, (index, states[index]))
-            )
+                (COMMAND_GET_COLLISION_SENSOR, (index, states[index])))
 
         results = [
             self._connection_read_fns[index]() for index in range(len(states))
         ]
 
         return results
-

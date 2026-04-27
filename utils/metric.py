@@ -1,19 +1,16 @@
-import os
-import json
-import numpy as np
-import re
-import tqdm
 import argparse
+import json
 import logging
+import os
+import re
 
+import numpy as np
+import tqdm
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] - %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s [%(levelname)s] - %(message)s",
+                    handlers=[logging.StreamHandler()])
+
 
 def sort_key(filename):
     """Sort function for filenames based on the numeric part."""
@@ -29,7 +26,7 @@ def load_json(file_path):
 def calculate_ne(path, dirs, success_dirs):
     """Calculate the NE (Normalized Error) between predicted and oracle trajectories."""
     ne_list = []
-    
+
     for traj_dir in tqdm.tqdm(dirs, desc='Calculating NE'):
         log_dir = os.path.join(path, traj_dir, 'log')
         logs = sorted(os.listdir(log_dir), key=sort_key)
@@ -38,7 +35,9 @@ def calculate_ne(path, dirs, success_dirs):
         last_point = np.array(last_log_data["sensors"]['state']['position'])
 
         ori_info = load_json(os.path.join(path, traj_dir, 'ori_info.json'))
-        ori_data = load_json(os.path.join(ori_info['ori_traj_dir'], 'merged_data.json'))['trajectory_raw_detailed']
+        ori_data = load_json(
+            os.path.join(ori_info['ori_traj_dir'],
+                         'merged_data.json'))['trajectory_raw_detailed']
         ori_last_point = np.array(ori_data[-1]['position'])
 
         ne = np.linalg.norm(ori_last_point - last_point)
@@ -70,17 +69,19 @@ def calculate_spl(path, dirs, success_dirs):
             pre_point = point
 
         ori_info = load_json(os.path.join(path, traj_dir, 'ori_info.json'))
-        ori_data = load_json(os.path.join(ori_info['ori_traj_dir'], 'merged_data.json'))['trajectory_raw_detailed']
+        ori_data = load_json(
+            os.path.join(ori_info['ori_traj_dir'],
+                         'merged_data.json'))['trajectory_raw_detailed']
 
         path_length = 0
         for i in range(len(ori_data) - 1):
             p1 = np.array(ori_data[i]['position'])
             p2 = np.array(ori_data[i + 1]['position'])
             path_length += np.linalg.norm(p2 - p1)
-        path_length -= 20  
+        path_length -= 20
 
         spl = path_length / max(path_length, pred_length)
-        spl = max(spl, 0) 
+        spl = max(spl, 0)
         spl_list.append(spl)
 
     avg_spl = np.mean(np.array(spl_list)) * 100
@@ -93,13 +94,22 @@ def split_data(path, path_type):
     return_dirs = []
 
     if path_type == 'full':
-        return [traj_dir for traj_dir in dirs if 'record' not in traj_dir and 'dino' not in traj_dir]
-    
+        return [
+            traj_dir for traj_dir in dirs
+            if 'record' not in traj_dir and 'dino' not in traj_dir
+        ]
+
     for traj_dir in tqdm.tqdm(dirs, desc='Splitting data'):
         ori_info = load_json(os.path.join(path, traj_dir, 'ori_info.json'))
-        ori_data = load_json(os.path.join(ori_info['ori_traj_dir'], 'merged_data.json'))['trajectory_raw_detailed']
+        ori_data = load_json(
+            os.path.join(ori_info['ori_traj_dir'],
+                         'merged_data.json'))['trajectory_raw_detailed']
 
-        path_length = sum(np.linalg.norm(np.array(ori_data[i + 1]['position']) - np.array(ori_data[i]['position'])) for i in range(len(ori_data) - 1))
+        path_length = sum(
+            np.linalg.norm(
+                np.array(ori_data[i + 1]['position']) -
+                np.array(ori_data[i]['position']))
+            for i in range(len(ori_data) - 1))
 
         if path_type == 'easy' and path_length <= 250:
             return_dirs.append(traj_dir)
@@ -107,13 +117,16 @@ def split_data(path, path_type):
             return_dirs.append(traj_dir)
         elif 'unseen' in path_type:
             unseen_scenes = ['Carla_Town03', 'ModularPark']
-            if path_type == 'unseen scene' and any(scene in ori_info['ori_traj_dir'] for scene in unseen_scenes):
+            if path_type == 'unseen scene' and any(
+                    scene in ori_info['ori_traj_dir']
+                    for scene in unseen_scenes):
                 return_dirs.append(traj_dir)
-            elif path_type == 'unseen object' and not any(scene in ori_info['ori_traj_dir'] for scene in unseen_scenes):
+            elif path_type == 'unseen object' and not any(
+                    scene in ori_info['ori_traj_dir']
+                    for scene in unseen_scenes):
                 return_dirs.append(traj_dir)
-    
-    return return_dirs
 
+    return return_dirs
 
 
 def analyze_results(root_dir, analysis_list, path_type_list):
@@ -151,10 +164,23 @@ def analyze_results(root_dir, analysis_list, path_type_list):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze the evaluation results for trajectory prediction.")
-    parser.add_argument('--root_dir', type=str, required=True, help="The root directory of the dataset.")
-    parser.add_argument('--analysis_list', type=str, nargs='+', required=True, help="List of analysis items to process.")
-    parser.add_argument('--path_type_list', type=str, nargs='+', required=True, help="List of path types to analyze.")
+    parser = argparse.ArgumentParser(
+        description="Analyze the evaluation results for trajectory prediction."
+    )
+    parser.add_argument('--root_dir',
+                        type=str,
+                        required=True,
+                        help="The root directory of the dataset.")
+    parser.add_argument('--analysis_list',
+                        type=str,
+                        nargs='+',
+                        required=True,
+                        help="List of analysis items to process.")
+    parser.add_argument('--path_type_list',
+                        type=str,
+                        nargs='+',
+                        required=True,
+                        help="List of path types to analyze.")
 
     args = parser.parse_args()
 

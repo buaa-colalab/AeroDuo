@@ -2,6 +2,7 @@ import os
 
 import torch
 import torch.distributed as dist
+
 from src.common.param import args
 
 
@@ -11,6 +12,7 @@ def is_dist_avail_and_initialized():
     if not dist.is_initialized():
         return False
     return True
+
 
 def get_world_size():
     if not is_dist_avail_and_initialized():
@@ -41,7 +43,8 @@ def init_distributed_mode():
     args.DistributedDataParallel = True
 
     torch.cuda.set_device(gpu)
-    print('distributed init (rank {}, word {})'.format(rank, world_size), flush=True)
+    print('distributed init (rank {}, word {})'.format(rank, world_size),
+          flush=True)
     torch.distributed.init_process_group(
         backend='nccl',
         init_method='env://',
@@ -64,7 +67,8 @@ def manual_init_distributed_mode(rank, world_size, local_rank):
     os.environ["RANK"] = str(rank)
     os.environ['LOCAL_RANK'] = str(local_rank)
 
-    print('distributed init (rank {}, word {})'.format(rank, world_size), flush=True)
+    print('distributed init (rank {}, word {})'.format(rank, world_size),
+          flush=True)
     torch.distributed.init_process_group(
         backend='nccl',
         init_method='env://',
@@ -75,28 +79,26 @@ def manual_init_distributed_mode(rank, world_size, local_rank):
 
 
 def FromPortGetPid(port: int):
+    import signal
     import subprocess
     import time
-    import signal
 
-    subprocess_execute = "netstat -nlp | grep {}".format(
-        port,
-    )
+    subprocess_execute = "netstat -nlp | grep {}".format(port, )
 
     try:
         p = subprocess.Popen(
             subprocess_execute,
-            stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            stdin=None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             shell=True,
         )
     except Exception as e:
-        print(
-            "{}\t{}\t{}".format(
-                str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
-                'FromPortGetPid',
-                e,
-            )
-        )
+        print("{}\t{}\t{}".format(
+            str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())),
+            'FromPortGetPid',
+            e,
+        ))
         return None
     except:
         return None
@@ -118,5 +120,3 @@ def FromPortGetPid(port: int):
         pass
 
     return pid
-
-

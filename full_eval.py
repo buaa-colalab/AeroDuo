@@ -1,61 +1,64 @@
-import cv2
-import re
-import os
 import json
+import math
+import os
+import re
 import time
+import traceback
+import warnings
+
+import cv2
+import msgpackrpc
+import numpy as np
 import torch
 import tqdm
-import math
-import numpy as np
 
 from navigator import Navigator
 from pilot_llm.api_for_airsim import CallPilot
-
+from src.common.param import args, data_args, model_args
 from src.vlnce_src.dino_monitor_online import DinoMonitor
-from src.common.param import args, model_args, data_args
 from src.vlnce_src.env_uav import AirVLNENV
-from utils.utils import is_dist_avail_and_initialized
 from utils.logger import logger
+from utils.utils import is_dist_avail_and_initialized
 
-import traceback
-import msgpackrpc
-
-import warnings
 warnings.filterwarnings("ignore")
 
+
 class BatchIterator:
+
     def __init__(self, env: AirVLNENV):
         self.env = env
-    
+
     def __len__(self):
         return len(self.env.data)
-    
+
     def __next__(self):
         # import ipdb;ipdb.set_trace()
         batch = self.env.next_minibatch()
         if batch is None:
             raise StopIteration
         return batch
-    
+
     def __iter__(self):
         batch = self.env.next_minibatch()
         if batch is None:
             raise StopIteration
         return batch
 
+
 class Metrics:
-    def __init__(self, log_path:str=None):
+
+    def __init__(self, log_path: str = None):
         self.log_path = log_path
         # ultimate metrics
         self.OSR = 0
         self.SR = 0
         self.CR = 0
-        self.airsim_CR = 0 
+        self.airsim_CR = 0
         self.SPL = 0
         self.SST = 0
-        self.TL = 0 # average trajectory length
+        self.TL = 0  # average trajectory length
         self.NE = 0
-        
+
         # intermediate statistics
         if os.path.exists(log_path):
             with open(log_path, 'r') as f:
@@ -77,7 +80,7 @@ class Metrics:
             self.total_cnt = 0
             self.success_cnt = 0
             self.oracle_success_cnt = 0
-            self.collision_cnt = 0 
+            self.collision_cnt = 0
             self.airsim_collision_cnt = 0
             self.spl_cnt = 0
             self.sst_cnt = 0
@@ -96,42 +99,49 @@ class Metrics:
         self.SPL = self.spl_cnt / self.total_cnt
         self.SST = self.sst_cnt / self.total_cnt
         self.TL = self.total_length / self.total_cnt
-        self.NE = self.total_error / self.total_cnt 
-        print("OSR: ", self.OSR, " SR: ", self.SR, " CR: ", self.CR, "airsim_CR: ", self.airsim_CR, " SPL: ", self.SPL, " SST: ", self.SST, "TL:", self.TL, " NE: ", self.NE)
+        self.NE = self.total_error / self.total_cnt
+        print("OSR: ", self.OSR, " SR: ", self.SR, " CR: ", self.CR,
+              "airsim_CR: ", self.airsim_CR, " SPL: ", self.SPL, " SST: ",
+              self.SST, "TL:", self.TL, " NE: ", self.NE)
 
         # save intermeidate statistics
         with open(self.log_path, 'w') as f:
-            json.dump({
-                "total_cnt": self.total_cnt,
-                "success_cnt": self.success_cnt,
-                "oracle_success_cnt": self.oracle_success_cnt,
-                "collision_cnt": self.collision_cnt,
-                "airsim_collision_cnt": self.airsim_collision_cnt,
-                "spl_cnt": self.spl_cnt,
-                "sst_cnt": self.sst_cnt,
-                "total_length": self.total_length,
-                "total_error": self.total_error,
-                "nav_time_stat": self.nav_time_stat,
-                "nav_velocity_stat": self.nav_velocity_stat,
-                "nav_stat_cnt": self.nav_stat_cnt
-            }, f)
+            json.dump(
+                {
+                    "total_cnt": self.total_cnt,
+                    "success_cnt": self.success_cnt,
+                    "oracle_success_cnt": self.oracle_success_cnt,
+                    "collision_cnt": self.collision_cnt,
+                    "airsim_collision_cnt": self.airsim_collision_cnt,
+                    "spl_cnt": self.spl_cnt,
+                    "sst_cnt": self.sst_cnt,
+                    "total_length": self.total_length,
+                    "total_error": self.total_error,
+                    "nav_time_stat": self.nav_time_stat,
+                    "nav_velocity_stat": self.nav_velocity_stat,
+                    "nav_stat_cnt": self.nav_stat_cnt
+                }, f)
 
 
 class TrajectoryStatus:
+
     def __init__(self, env_batches, train_env, object_desc_dict, args):
         self.ori_data_dirs = [b['seq_name'] for b in env_batches]
         self.map_names = [b['map_name'] for b in env_batches]
         self.target_positions = [b['object_position'] for b in env_batches]
-        self.object_infos = [object_desc_dict.get(b['object']['asset_name'].replace("AA", ""), 
-                                re.sub(r'(SM_|AASM_)?\d*([a-zA-Z]+)\d*', r'\2', b['object']['asset_name'])) 
-                            for b in env_batches]
+        self.object_infos = [
+            object_desc_dict.get(
+                b['object']['asset_name'].replace("AA", ""),
+                re.sub(r'(SM_|AASM_)?\d*([a-zA-Z]+)\d*', r'\2',
+                       b['object']['asset_name'])) for b in env_batches
+        ]
         self.gt_drone1_trajs = [b['drone1_traj'] for b in env_batches]
         self.gt_drone2_trajs = [b['drone2_traj'] for b in env_batches]
         self.drone1_trajs = [[] for _ in range(train_env.batch_size)]
         self.drone2_trajs = [[] for _ in range(train_env.batch_size)]
         self.raw_instructions = [b['instruction'] for b in env_batches]
 
-        self.train_env = train_env        
+        self.train_env = train_env
         self.episodes = [[] for _ in range(train_env.batch_size)]
         self.skips = [False for _ in range(train_env.batch_size)]
         self.dones = [False for _ in range(train_env.batch_size)]
@@ -143,7 +153,7 @@ class TrajectoryStatus:
         self.early_end = [False for _ in range(train_env.batch_size)]
         self.envs_to_pause = []
 
-        self.maxWaypoints = args.maxWaypoints # 50
+        self.maxWaypoints = args.maxWaypoints  # 50
         self.is_end = False
         self.eval_save_dir = args.eval_save_path
 
@@ -157,9 +167,7 @@ class TrajectoryStatus:
         self.time = 0
         self.airsim_collision = False
 
-
-
-    def calculate_traj_stats(self, metrics:Metrics):
+    def calculate_traj_stats(self, metrics: Metrics):
         # calculate optimal distance
         tot_distance = 0
         traj_waypoint = self.gt_drone1_trajs[0]
@@ -171,7 +179,8 @@ class TrajectoryStatus:
 
         # retrieve optimal time
         root_path = "data/HaL-13k"
-        time_json_path = os.path.join(root_path, self.map_names[0], self.ori_data_dirs[0], "time.json")
+        time_json_path = os.path.join(root_path, self.map_names[0],
+                                      self.ori_data_dirs[0], "time.json")
         with open(time_json_path, 'r') as f:
             tot_time = json.load(f)["gt_time"]
 
@@ -190,46 +199,44 @@ class TrajectoryStatus:
         f_y = h / (2 * math.tan(math.radians(FOV / 2)))
 
         # 预计算内参逆矩阵
-        intrinsic_inv = np.linalg.inv(np.array([
-            [f_x, 0, c_x], 
-            [0, f_y, c_y], 
-            [0, 0, 1]
-        ]))
+        intrinsic_inv = np.linalg.inv(
+            np.array([[f_x, 0, c_x], [0, f_y, c_y], [0, 0, 1]]))
 
         # 旋转矩阵逆矩阵 (从相机坐标系转换到世界坐标系)
-        r_inv = np.linalg.inv(np.array([
-            [0, 1, 0], 
-            [-1, 0, 0], 
-            [0, 0, 1]
-        ]))
+        r_inv = np.linalg.inv(np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]]))
 
         # 生成图像像素坐标 (u, v)
         i, j = np.indices(depth_image.shape)
         z = depth_image.astype(np.float32)
-        bev_camera_pos = np.array(bev_camera_pos).reshape(3,1) # (3, 1)
+        bev_camera_pos = np.array(bev_camera_pos).reshape(3, 1)  # (3, 1)
 
         # 计算 3D 坐标
-        pixels_homogeneous = np.stack((j * z, i * z, z), axis=-1)  # (1024, 1024, 3)
-        pixels_homogeneous = np.expand_dims(pixels_homogeneous, -1) # (1024, 1024, 3, 1)
-        coor_3d = bev_camera_pos + r_inv @ intrinsic_inv @ pixels_homogeneous # r_inv @ intrinsic_inv @ pixels_homogeneous shape: (1024, 1024, 3, 1)
+        pixels_homogeneous = np.stack((j * z, i * z, z),
+                                      axis=-1)  # (1024, 1024, 3)
+        pixels_homogeneous = np.expand_dims(pixels_homogeneous,
+                                            -1)  # (1024, 1024, 3, 1)
+        coor_3d = bev_camera_pos + r_inv @ intrinsic_inv @ pixels_homogeneous  # r_inv @ intrinsic_inv @ pixels_homogeneous shape: (1024, 1024, 3, 1)
 
         return coor_3d.squeeze(-1)
 
     def update_pointclouds(self, bev_camera_pos):
         bev_depth = self.fetch_from_observations("bev_depth")
         for i in range(self.train_env.batch_size):
-            self.pointclouds[i].append(self.project_image_to_3d(bev_depth[i], bev_camera_pos[i]))
+            self.pointclouds[i].append(
+                self.project_image_to_3d(bev_depth[i], bev_camera_pos[i]))
         return self.pointclouds
-    
+
     def update_bevs(self):
         bev = self.fetch_from_observations("bev")
         bev_depth = self.fetch_from_observations("bev_depth")
         for i in range(self.train_env.batch_size):
             self.bevs[i].append(bev[i])
             self.bev_depths[i].append(bev_depth[i])
-        
+
     def update_observation(self, outputs, pos_list, airsim_collision):
-        observations, dones, collisions, oracle_success = [list(x) for x in zip(*outputs)]
+        observations, dones, collisions, oracle_success = [
+            list(x) for x in zip(*outputs)
+        ]
         self.observations = observations
         self.update_bevs()
 
@@ -245,20 +252,27 @@ class TrajectoryStatus:
             self.oracle_success[i] = oracle_success[i]
             self.drone1_trajs[i].extend(pos_list)
             if len(pos_list) > 0:
-                new_distance_to_ends = [np.linalg.norm(np.array(pos) - np.array(self.target_positions[i])) for pos in pos_list]
+                new_distance_to_ends = [
+                    np.linalg.norm(
+                        np.array(pos) - np.array(self.target_positions[i]))
+                    for pos in pos_list
+                ]
                 for distance in new_distance_to_ends:
                     if distance <= 20:
                         self.oracle_success[i] = True
                         break
                 self.distance_to_ends[i].extend(new_distance_to_ends)
             if len(self.drone1_trajs[i]) == 0:
-                self.drone1_trajs[i].append(observations[i][-1]['sensors']['state']['position'])
+                self.drone1_trajs[i].append(
+                    observations[i][-1]['sensors']['state']['position'])
             if len(self.drone2_trajs[i]) > 0:
                 last_point = self.drone2_trajs[i][-1]
-                now_point = self.train_env.sim_states[i].drone2_traj[-1]['position']
+                now_point = self.train_env.sim_states[i].drone2_traj[-1][
+                    'position']
                 direction = np.array(now_point) - np.array(last_point)
                 distance = np.linalg.norm(direction)
-                unit_direction = direction / distance if distance > 0 else np.zeros_like(direction)
+                unit_direction = direction / distance if distance > 0 else np.zeros_like(
+                    direction)
                 # new point every 5 meters
                 new_point = last_point
                 while distance > 5:
@@ -266,7 +280,8 @@ class TrajectoryStatus:
                     self.drone2_trajs[i].append(new_point.tolist())
                     distance -= 5
             else:
-                self.drone2_trajs[i].append(self.train_env.sim_states[i].drone2_traj[-1]['position'])
+                self.drone2_trajs[i].append(
+                    self.train_env.sim_states[i].drone2_traj[-1]['position'])
 
             if self.oracle_success[i]:
                 self.check_deviation(i)
@@ -278,7 +293,7 @@ class TrajectoryStatus:
         folder_names = ['bevcamera', 'log', 'log2']
         for folder_name in folder_names:
             os.makedirs(os.path.join(root_path, folder_name), exist_ok=True)
-        
+
         # TODO: finish and reactivate
         # self.save_images(root_path, i)
         self.save_logs(root_path, i)
@@ -296,24 +311,29 @@ class TrajectoryStatus:
             #         cv2.imwrite(os.path.join(trajectory_dir, camera_name, str(idx).zfill(6) + '.png'), image)
             if 'bev' in episode:
                 image = episode['bev']
-                cv2.imwrite(os.path.join(trajectory_dir, 'bevcamera', str(idx).zfill(6) + '.png'), image)
+                cv2.imwrite(
+                    os.path.join(trajectory_dir, 'bevcamera',
+                                 str(idx).zfill(6) + '.png'), image)
             # if 'bev_depth' in episode:
             #     image = episode['bev_depth']
             #     cv2.imwrite(os.path.join(trajectory_dir, 'bevcamera_depth', str(idx).zfill(6) + '.png'), image)
-   
+
     def save_logs(self, trajectory_dir, i):
-        # TODO: save dagger info 
+        # TODO: save dagger info
         drone1_traj = self.drone1_trajs[i]
         save_dir = os.path.join(trajectory_dir, 'log')
         for idx, point in enumerate(drone1_traj):
-            with open(os.path.join(save_dir, str(idx).zfill(6) + '.json'), 'w') as f:
+            with open(os.path.join(save_dir,
+                                   str(idx).zfill(6) + '.json'), 'w') as f:
                 json.dump(point, f)
 
         # TODO: save drone2 traj
         drone2_traj = self.drone2_trajs[i]
         drone2_save_dir = os.path.join(trajectory_dir, 'log2')
         for idx, point in enumerate(drone2_traj):
-            with open(os.path.join(drone2_save_dir, str(idx).zfill(6) + '.json'), 'w') as f:
+            with open(
+                    os.path.join(drone2_save_dir,
+                                 str(idx).zfill(6) + '.json'), 'w') as f:
                 json.dump(point, f)
 
     def check_traj_status(self, metrics):
@@ -321,7 +341,9 @@ class TrajectoryStatus:
             if len(self.drone1_trajs[0]) - 1 > self.maxWaypoints:
                 self.dones[i] = True
             if len(self.drone1_trajs[i]) > 1:
-                delta_distance = np.linalg.norm(np.array(self.drone1_trajs[i][-1]) - np.array(self.drone1_trajs[i][-2]))
+                delta_distance = np.linalg.norm(
+                    np.array(self.drone1_trajs[i][-1]) -
+                    np.array(self.drone1_trajs[i][-2]))
                 if delta_distance < 0.1:
                     self.collisions[i] = True
             # 检验每一条轨迹有没有结束
@@ -338,7 +360,8 @@ class TrajectoryStatus:
                 elif self.oracle_success[i]:
                     prex = "oracle_"
                     print(i, " has oracle succeed!")
-                new_traj_name = prex +  self.ori_data_dirs[i] # str(uuid.uuid4())
+                new_traj_name = prex + self.ori_data_dirs[
+                    i]  # str(uuid.uuid4())
                 new_traj_dir = os.path.join(self.eval_save_dir, new_traj_name)
                 self.save_to_dataset(new_traj_dir, i)
                 self.skips[i] = True
@@ -356,14 +379,14 @@ class TrajectoryStatus:
         assert spl > 0, "SPL should be greater than 0"
 
         return spl
-    
+
     def calculate_sst(self, gt_time):
         sst = gt_time / max(gt_time, self.time)
         assert sst > 0, "SST should be greater than 0"
-        
+
         return sst
 
-    def update_metrics(self, metrics:Metrics, new_traj_dir):
+    def update_metrics(self, metrics: Metrics, new_traj_dir):
         # we temporarily take bs=1
         metrics.total_cnt += 1
         spl_cnt = 0
@@ -401,31 +424,33 @@ class TrajectoryStatus:
         }
         with open(os.path.join(new_traj_dir, "state_log.json"), 'w') as f:
             json.dump(state_log, f)
-        
+
         metrics.update_ultimate_metrics()
-        
+
     def search_target_with_monitor(self, cur_pos, rgb, depth):
         for i in range(self.train_env.batch_size):
             if self.dones[i]:
                 continue
 
-            self.dino_results[i] = self.monitor.get_dino_results(rgb, depth, self.object_infos[i])
-            distance_to_end = np.linalg.norm(np.array(cur_pos) - np.array(self.target_positions[i]))
+            self.dino_results[i] = self.monitor.get_dino_results(
+                rgb, depth, self.object_infos[i])
+            distance_to_end = np.linalg.norm(
+                np.array(cur_pos) - np.array(self.target_positions[i]))
             if self.dino_results[i] and not self.skips[i]:
-                if distance_to_end <= 25: # TODO: use 25 to compensate the dino interval
+                if distance_to_end <= 25:  # TODO: use 25 to compensate the dino interval
                     self.success[i] = True
                 elif distance_to_end > 20:
                     self.early_end[i] = True
-                
+
                 if self.oracle_success[i] and self.early_end[i]:
                     self.dones[i] = True
                 elif self.success[i]:
                     self.dones[i] = True
 
         return self.dones[0]
-        
 
     def check_deviation(self, i):
+
         def target_distance_increasing_for_10frames(lst):
             if len(lst) < 10:
                 return False
@@ -434,7 +459,7 @@ class TrajectoryStatus:
                 if sublist[i] < sublist[i - 1]:
                     return False
             return True
-        
+
         if target_distance_increasing_for_10frames(self.distance_to_ends[i]):
             self.dones[i] = True
 
@@ -442,8 +467,8 @@ class TrajectoryStatus:
         raw_instructions = self.fetch_instruction()
         bev_images = self.bevs
         bev_depths = self.bev_depths
-        drone1_start = [batch[-1] for batch in self.drone1_trajs] 
-        drone2_start = [batch[-1] for batch in self.drone2_trajs] 
+        drone1_start = [batch[-1] for batch in self.drone1_trajs]
+        drone2_start = [batch[-1] for batch in self.drone2_trajs]
         point_clouds = self.update_pointclouds(drone2_start)
         drone1_traj = self.drone1_trajs
         drone2_traj = self.drone2_trajs
@@ -475,28 +500,35 @@ class TrajectoryStatus:
         for i in range(self.train_env.batch_size):
             result.append(self.observations[i][-1][key])
         return result
-    
-    def update_navigator_extra_statistics(self, metrics:Metrics, nav_time, nav_velocity):
+
+    def update_navigator_extra_statistics(self, metrics: Metrics, nav_time,
+                                          nav_velocity):
         metrics.nav_time_stat += nav_time
         metrics.nav_velocity_stat += nav_velocity
         metrics.nav_stat_cnt += 1
         print("-----------------------------")
-        print(f"mean velocity: {nav_velocity:.2f} m/s, navigation time: {nav_time:.2f} s")
+        print(
+            f"mean velocity: {nav_velocity:.2f} m/s, navigation time: {nav_time:.2f} s"
+        )
         print("-----------------------------")
 
 
 def init_llm_planner(args):
-    return CallPilot(checkpoint_path=args.llm_checkpoint_path ,device=args.device, use_a_star=args.use_a_star)
+    return CallPilot(checkpoint_path=args.llm_checkpoint_path,
+                     device=args.device,
+                     use_a_star=args.use_a_star)
+
 
 # @hydra.main(config_path=FILE_PATH, config_name="train", version_base=None)
 def load_hydra_cfg():
     from hydra import compose, initialize
 
-    file_path = "scripts/cfg" 
+    file_path = "scripts/cfg"
     with initialize(config_path=file_path):
         cfg = compose(config_name="train")
 
     return cfg
+
 
 # TODO: deal with the case when batch_size > 1
 def init_navigator(cfg, train_env: AirVLNENV):
@@ -506,7 +538,7 @@ def init_navigator(cfg, train_env: AirVLNENV):
 
 
 def main():
-    cfg = load_hydra_cfg()    
+    cfg = load_hydra_cfg()
     save_path = args.eval_save_path
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -515,8 +547,10 @@ def main():
     args.DistributedDataParallel = False
 
     # init env to deal with the communication between the simulator and the model
-    train_env = AirVLNENV(batch_size=args.batchSize, dataset_path=args.dataset_path, save_path=save_path)
-    
+    train_env = AirVLNENV(batch_size=args.batchSize,
+                          dataset_path=args.dataset_path,
+                          save_path=save_path)
+
     # init planner, navigator and monitor
     llm_planner = init_llm_planner(args)
     navigator = init_navigator(cfg, train_env)
@@ -525,7 +559,7 @@ def main():
     # init metrics
     log_path = os.path.join(save_path, "metrics_log.json")
     metrics = Metrics(log_path=log_path)
-    
+
     # init object list
     object_desc_dict = dict()
     with open("data/config/object_new_name.json") as f:
@@ -537,21 +571,22 @@ def main():
     with torch.no_grad():
         dataset = BatchIterator(train_env)
         end_iter = len(dataset)
-        pbar =tqdm.tqdm(total=end_iter)
+        pbar = tqdm.tqdm(total=end_iter)
 
         while True:
             env_batches = train_env.next_minibatch()
             if env_batches is None:
                 break
             # states to record
-            traj_status = TrajectoryStatus(env_batches, train_env, object_desc_dict, args)
+            traj_status = TrajectoryStatus(env_batches, train_env,
+                                           object_desc_dict, args)
             traj_status.init_dino_monitor(dino_monitor)
 
             pbar.update(n=train_env.batch_size)
 
             seq_name = traj_status.ori_data_dirs[0]
             llm_planner.update_traj_info(seq_name)
-                        
+
             # reset设置轨迹的初始状态
             # 我们的output应当包括：图片（第5帧）、位置（1-5帧）、姿态（1-5帧）、语言指令
             # reset时的output则是第0帧的上述内容
@@ -559,7 +594,8 @@ def main():
             if train_env.is_NYC == True:
                 llm_planner.reset_ortho_granularity(0.6)
 
-            navigator.update_airsim_client(train_env.simulator_tool.airsim_clients[0][0])
+            navigator.update_airsim_client(
+                train_env.simulator_tool.airsim_clients[0][0])
             # 轨迹中添加初始状态
             traj_status.update_observation(outputs, [], airsim_collision=False)
 
@@ -570,23 +606,27 @@ def main():
                 if t >= args.maxWaypoints:
                     traj_status.dones[0] = True
 
-                logger.info('Step: {} \t Completed: {} / {}'.format(t, int(train_env.index_data)-int(train_env.batch_size), end_iter))
+                logger.info('Step: {} \t Completed: {} / {}'.format(
+                    t,
+                    int(train_env.index_data) - int(train_env.batch_size),
+                    end_iter))
 
                 cur_time = time.time()
                 if pre_time is None:
                     pre_time = cur_time
                 else:
-                    logger.info('Time Cost : {} s'.format(round(cur_time - pre_time, 2)))
+                    logger.info('Time Cost : {} s'.format(
+                        round(cur_time - pre_time, 2)))
                     pre_time = cur_time
 
                 # check traj status
                 if traj_status.check_traj_status(metrics):
                     break
 
-                # waypoint + LLM预测轨迹点                
+                # waypoint + LLM预测轨迹点
                 t1 = time.time()
                 inputs = traj_status.prepare_llm_inputs()
-                waypoint_list, _ = llm_planner(**inputs) 
+                waypoint_list, _ = llm_planner(**inputs)
                 t2 = time.time()
                 print(f"llm prediction time: {t2-t1}")
 
@@ -600,7 +640,9 @@ def main():
                     # TODO: predict drone2 traj
                     drone2_waypoint = traj_status.target_positions
                     drone1_waypoint = [waypoint]
-                    collision, drone2_collision, delta_time, delta_distance, end_pos, airsim_collision = train_env.makeActions(drone1_waypoint, drone2_waypoint, navigator, traj_status)
+                    collision, drone2_collision, delta_time, delta_distance, end_pos, airsim_collision = train_env.makeActions(
+                        drone1_waypoint, drone2_waypoint, navigator,
+                        traj_status)
                     # update intermediate metrics
                     traj_status.steps += 1
                     traj_status.distance += delta_distance
@@ -631,12 +673,15 @@ def main():
                         break
                 if accumulate_time > 1:
                     end_time = time.time()
-                    total_nav_time = end_time - start_time 
+                    total_nav_time = end_time - start_time
                     mean_velocity = accumulate_distance / accumulate_time
-                    traj_status.update_navigator_extra_statistics(metrics, total_nav_time, mean_velocity)
-                
+                    traj_status.update_navigator_extra_statistics(
+                        metrics, total_nav_time, mean_velocity)
+
                 outputs = train_env.get_obs()
-                traj_status.update_observation(outputs, pos_list, airsim_collision)
+                traj_status.update_observation(outputs, pos_list,
+                                               airsim_collision)
+
 
 if __name__ == "__main__":
     # Airsim simulator server is very unstable, so we need to retry if it fails
@@ -644,7 +689,8 @@ if __name__ == "__main__":
         try:
             main()
             break
-        except (msgpackrpc.error.TimeoutError, ConnectionError, TimeoutError) as e:
+        except (msgpackrpc.error.TimeoutError, ConnectionError,
+                TimeoutError) as e:
             print(f"AirSim connection error, retrying: {e}")
             traceback.print_exc()
             time.sleep(3)
