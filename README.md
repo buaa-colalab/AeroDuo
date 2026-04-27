@@ -1,17 +1,52 @@
 <div align="center">
 <h1>AeroDuo: Aerial Duo for UAV-based Vision and Language Navigation</h1>
 
+<div>
+    Ruipu Wu<sup>1</sup>&emsp;
+    Yige Zhang<sup>1</sup>&emsp;
+    Jinyu Chen<sup>1</sup>&emsp;
+    Linjiang Huang<sup>1</sup>&emsp;
+    Shifeng Zhang<sup>2</sup>&emsp;
+    Xu Zhou<sup>2</sup>&emsp;
+    Liang Wang<sup>3</sup>&emsp;
+    Si Liu<sup>1</sup>&emsp;
+
+</div>
+<div>
+    <sup>1</sup>Beihang University&emsp;
+    <sup>2</sup>Sangfor Technologies Inc.&emsp;
+    <sup>3</sup>CASIA
+</div>
+
+<div>
+    <strong>ACM MM 2025</strong>
+</div>
+
+<div>
+  <h4 align="center">
+    <a href="https://arxiv.org/abs/2508.15232"><img src='https://img.shields.io/badge/arXiv-AeroDuo-red' alt='Paper PDF'></a>
+    <a href='https://rey-nard.github.io/AeroDuo_project/'><img src='https://img.shields.io/badge/Project_Page-AeroDuo-green' alt='Project Page'></a>
+    <a href='https://huggingface.co/datasets/wangxiangyu0814/TravelUAV_env'><img src='https://img.shields.io/badge/Env-TRAVEL-blue'></a>
+    <a href='https://modelscope.cn/datasets/Reynard/HaL-13k/files'><img src='https://img.shields.io/badge/Dataset-HaL13k-blue'></a>
+    <a href='https://huggingface.co/datasets/salome1023/HaL-13k_testset'><img src='https://img.shields.io/badge/Dataset-HaL13k_testset-blue'></a>
+  </h4>
+</div>
+
+<div>
+  <strong>
+  In Aeroduo, we introduce a dual-altitude collaborative framework, a dual-altitude VLN dataset, and a multimodal system for autonomous UAV flight.
+  </strong>
+</div>
+
+<div style="text-align:center; margin-top: 16px;">
 <image src="assets/teaser.png" width="100%">
-<a href="https://arxiv.org/abs/2508.15232"><img src='https://img.shields.io/badge/arXiv-AeroDuo-red' alt='Paper PDF'></a>
-<a href='https://rey-nard.github.io/AeroDuo_project/'><img src='https://img.shields.io/badge/Project_Page-AeroDuo-green' alt='Project Page'></a>
-<a href='https://huggingface.co/datasets/wangxiangyu0814/TravelUAV_env'><img src='https://img.shields.io/badge/Env-TRAVEL-blue'></a>
-<a href='https://modelscope.cn/datasets/Reynard/HaL-13k/files'><img src='https://img.shields.io/badge/Dataset-HaL13k-blue'></a>
-<a href='https://huggingface.co/datasets/salome1023/HaL-13k_testset'><img src='https://img.shields.io/badge/Dataset-HaL13k_testset-blue'></a>
+</div>
+
+
 </div>
 
 # Contents
 
-- [Introduction](#introduction)
 - [News](#news)
 - [Requirements and Installation](#requirements)
   - [Python Environment](#python-environment)
@@ -22,10 +57,7 @@
 - [Evaluation](#eval)
 
 
-# Introduction
-This work presents **_AeroDuo: Aerial Duo for UAV-based Vision and Language Navigation_**. We introduce a dual-altitude collaborative framework, a dual-altitude VLN dataset, and a multimodal system for autonomous UAV flight.
-
-# 📰News <a id="news"></a>
+#  📢 News <a id="news"></a>
 **2026-02-06:**  The train scripts and the complete HaL-13k are released.
 
 **2025-12-05:**  Paper, project page, code, testset data, envs and models are all released.
@@ -161,9 +193,9 @@ The user could consider setting --use_a_star in `eval.sh` to False (default is T
 - [x] Release the train scripts and the complete HaL-13k.
 - [ ] Optimize the A* algorithm.
 
-# Paper
+# 📝 Citation
 
-If you find this project useful, please consider citing:
+If you find this work useful, please consider citing our paper:
 ```bibtex
     @inproceedings{wu2025aeroduo,
       title     = {AeroDuo: Aerial Duo for UAV-based Vision and Language Navigation},
@@ -174,6 +206,10 @@ If you find this project useful, please consider citing:
     }
 ```
 
-# Acknowledgement
+# 📄 License
+
+This project is licensed under the Apache-2.0 License. See [LICENSE](./LICENSE) for more information.
+
+# 🙏 Acknowledgement
 
 This repository is partly based on [TravelUAV](https://github.com/prince687028/TravelUAV) and [Qwen2-VL](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct) repositories.
