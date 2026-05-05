@@ -279,11 +279,15 @@ class AirSimDataset(torch.utils.data.Dataset):
         }
 
     def __getitem__(self, idx):
-        try:
-            return self.get_batch(idx)
-        except Exception as e:
-            print(e)
-            return self.__getitem__((idx + 1) % self.__len__())
+        n = self.__len__()
+        cur = idx
+        for _ in range(min(n, 50)):
+            try:
+                return self.get_batch(cur)
+            except Exception as e:
+                print(f"[AirSimDataset] skip idx={cur}: {e}")
+                cur = int(np.random.randint(0, n))
+        raise RuntimeError("AirSimDataset: too many bad samples")
 
 
 def find_assistant_content_sublist_indexes(l):

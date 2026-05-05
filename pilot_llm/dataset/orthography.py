@@ -63,6 +63,9 @@ class Orthophoto:
         if depth_images is not None:
             all_depth = all_depth[valid_mask]
 
+        if all_x.size == 0:
+            raise ValueError("orthorectify: empty point cloud after z-filter")
+
         # Get global coordinate range
         min_x, min_y = np.min(all_x), np.min(all_y)
         max_x, max_y = np.max(all_x), np.max(all_y)
